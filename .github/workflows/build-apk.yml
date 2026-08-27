@@ -21,6 +21,7 @@ jobs:
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml 2>/dev/null || true
           cp -r android/app/src/main/res /tmp/res 2>/dev/null || true
           cp assets/images/logo.png /tmp/logo.png 2>/dev/null || true
+          cp -r assets/images/cards /tmp/cards 2>/dev/null || true
           flutter create . --project-name kartak --org com.kartak --platforms android
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml 2>/dev/null || true
@@ -28,6 +29,8 @@ jobs:
           mkdir -p android/app/src/main/res
           cp -r /tmp/res/* android/app/src/main/res/ 2>/dev/null || true
           cp /tmp/logo.png assets/images/logo.png 2>/dev/null || true
+          mkdir -p assets/images/cards
+          cp -r /tmp/cards/* assets/images/cards/ 2>/dev/null || true
           echo "=== BEFORE fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
           sed -i 's/applicationId "com\.kartak\.kartak"/applicationId "com.kartak.app"/g' android/app/build.gradle || true
@@ -40,6 +43,7 @@ jobs:
         run: |
           if [ ! -f "assets/images/logo.png" ]; then echo "no logo"; exit 0; fi
           echo "Generating launcher icons via Python PIL"
+          pip install pillow -q
           cat > /tmp/gen_icons.py << 'PY'
           from PIL import Image
           import pathlib
