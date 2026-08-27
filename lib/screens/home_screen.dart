@@ -189,155 +189,225 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final connected = msisdn != null && token != null;
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
-        title: Row(children: [
-          Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
-          const SizedBox(width: 10),
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
-          ]),
-        ]),
-        actions: [IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
-      ),
-      body: checkingSub
-          ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-          : expired
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Card(
-                      color: Colors.red.shade50,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.block, size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          const Text('اشتراكك انتهي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
-                          const SizedBox(height: 8),
-                          const Text('تواصل مع المطور لتجديد الاشتراك', textAlign: TextAlign.center),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                              onPressed: _contactExpired,
-                              icon: const Icon(Icons.chat),
-                              label: const Text('تواصل مع المطور - واتساب'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(onPressed: () async => await FirebaseAuth.instance.signOut(), child: const Text('تسجيل خروج')),
-                        ]),
-                      ),
+    final fakkaProducts = VodafoneService.products.where((p) => p.$2.contains("فكة")).toList();
+    final maredProducts = VodafoneService.products.where((p) => p.$2.contains("مارد")).toList();
+
+    Widget buildGrid(List<(String, String, String)> items) {
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.78,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, idx) {
+          final p = items[idx];
+          final pid = p.$3;
+          final name = p.$2;
+          final number = p.$1;
+          final unitsText = VodafoneService.getUnits(pid);
+          final isFakka = name.contains("فكة");
+          final isMared = name.contains("مارد");
+          return InkWell(
+            onTap: () => openCard(pid, name, number),
+            borderRadius: BorderRadius.circular(16),
+            child: Card(
+              color: const Color(0xFF1E293B),
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: [
+                SizedBox(
+                  height: 110,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          'assets/images/cards/$pid.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                        ),
+                        Container(color: Colors.black.withOpacity(0.12)),
+                        Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
+                        Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
+                      ],
                     ),
                   ),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(children: [
-                    // اتصال
-                    Card(
-                      color: const Color(0xFF1E293B),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text("① الاتصال بالمحفظة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                          const Text("لازم داتا فودافون أو VPN", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                          const SizedBox(height: 8),
-                          Row(children: [
-                            Expanded(child: Text(connected ? "✓ $msisdn" : "● غير متصل", style: TextStyle(color: connected ? Colors.greenAccent : Colors.white60, fontWeight: FontWeight.bold))),
-                            ElevatedButton(onPressed: connecting ? null : connect, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white), child: connecting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("↻ اتصال")),
-                          ]),
-                          if (connected) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.shade900.withOpacity(0.5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)), child: Row(children: [const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16), const SizedBox(width: 6), Expanded(child: Text("رقم المحفظة: $msisdn - الجلسة نشطة", style: const TextStyle(color: Colors.greenAccent, fontSize: 12)))])),
-                          if (!connected) const Padding(padding: EdgeInsets.only(top: 8), child: Text("⚠️ اتصل أولاً ثم اضغط على أي كارت", style: TextStyle(color: Colors.orangeAccent, fontSize: 11))),
-                        ]),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // شبكة الكروت - كل كارت قالب
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.78,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
-                      itemCount: VodafoneService.products.length,
-                      itemBuilder: (context, idx) {
-                        final p = VodafoneService.products[idx];
-                        final pid = p.$3;
-                        final name = p.$2;
-                        final number = p.$1;
-                        // الواحدات مكتوبة على الكارت من بره
-                        final isFakka = name.contains("فكة");
-                        final isMared = name.contains("مارد");
-                        return InkWell(
-                          onTap: () => openCard(pid, name, number),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Card(
-                            color: const Color(0xFF1E293B),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            clipBehavior: Clip.antiAlias,
-                            child: Column(children: [
-                              // صورة القالب - صورة مخصصة لكل كارت وإلا fallback للوجو
-                              SizedBox(
-                                height: 110,
-                                width: double.infinity,
-                                child: ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      Image.asset(
-                                        'assets/images/cards/$pid.png',
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-                                      ),
-                                      Container(color: Colors.black.withOpacity(0.12)),
-                                      Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
-                                      Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(children: [
-                                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    const Spacer(),
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(vertical: 6),
-                                      decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)),
-                                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.touch_app, color: Colors.white, size: 14), SizedBox(width: 4), Text("اضغط للشحن", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))]),
-                                    ),
-                                    if (!connected) const Padding(padding: EdgeInsets.only(top: 4), child: Text("غير متصل", style: TextStyle(color: Colors.red, fontSize: 9))),
-                                  ]),
-                                ),
-                              ),
-                            ]),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                    const SizedBox(height: 4),
-                    const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                  ]),
                 ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(children: [
+                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      if (unitsText.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(unitsText, style: const TextStyle(color: Color(0xFFFACC15), fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      const Spacer(),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)),
+                        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.touch_app, color: Colors.white, size: 14), SizedBox(width: 4), Text("اضغط للشحن", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))]),
+                      ),
+                      if (!connected) const Padding(padding: EdgeInsets.only(top: 4), child: Text("غير متصل", style: TextStyle(color: Colors.red, fontSize: 9))),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      );
+    }
+
+    final connectionCard = Card(
+      color: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text("① الاتصال بالمحفظة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text("لازم داتا فودافون أو VPN", style: TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: Text(connected ? "✓ $msisdn" : "● غير متصل", style: TextStyle(color: connected ? Colors.greenAccent : Colors.white60, fontWeight: FontWeight.bold))),
+            ElevatedButton(onPressed: connecting ? null : connect, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white), child: connecting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("↻ اتصال")),
+          ]),
+          if (connected) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.shade900.withOpacity(0.5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)), child: Row(children: [const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16), const SizedBox(width: 6), Expanded(child: Text("رقم المحفظة: $msisdn - الجلسة نشطة", style: const TextStyle(color: Colors.greenAccent, fontSize: 12)))])),
+          if (!connected) const Padding(padding: EdgeInsets.only(top: 8), child: Text("⚠️ اتصل أولاً ثم اضغط على أي كارت", style: TextStyle(color: Colors.orangeAccent, fontSize: 11))),
+        ]),
+      ),
+    );
+
+    if (checkingSub) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
+            const SizedBox(width: 10),
+            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
+            ]),
+          ]),
+          actions: [IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
+        ),
+        body: const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator())),
+      );
+    }
+    if (expired) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
+            const SizedBox(width: 10),
+            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
+            ]),
+          ]),
+          actions: [IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Card(
+              color: Colors.red.shade50,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.block, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text('اشتراكك انتهي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
+                  const SizedBox(height: 8),
+                  const Text('تواصل مع المطور لتجديد الاشتراك', textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                      onPressed: _contactExpired,
+                      icon: const Icon(Icons.chat),
+                      label: const Text('تواصل مع المطور - واتساب'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: () async => await FirebaseAuth.instance.signOut(), child: const Text('تسجيل خروج')),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
+            const SizedBox(width: 10),
+            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
+            ]),
+          ]),
+          actions: [IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
+          bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            indicatorColor: Color(0xFFE11D48),
+            indicatorWeight: 3,
+            tabs: [
+              Tab(icon: Icon(Icons.credit_card), text: "فكة"),
+              Tab(icon: Icon(Icons.phone_in_talk), text: "مارد"),
+            ],
+          ),
+        ),
+        body: Column(children: [
+          Padding(padding: const EdgeInsets.all(12), child: connectionCard),
+          Expanded(
+            child: TabBarView(children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: Column(children: [
+                  buildGrid(fakkaProducts),
+                  const SizedBox(height: 12),
+                  const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 4),
+                  const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                ]),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: Column(children: [
+                  buildGrid(maredProducts),
+                  const SizedBox(height: 12),
+                  const Text("المارد - باقات مكالمات وفليكسات", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  const SizedBox(height: 8),
+                  const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 }
