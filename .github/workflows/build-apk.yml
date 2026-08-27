@@ -17,19 +17,35 @@ jobs:
           cache: true
       - name: Generate Android project
         run: |
-          # يحافظ على google-services.json
           cp android/app/google-services.json /tmp/google-services.json 2>/dev/null || true
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml 2>/dev/null || true
-          flutter create . --project-name kartak --org com.kartak --platforms android --no-pub
+          flutter create . --project-name kartak --org com.kartak --platforms android
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml 2>/dev/null || true
           cp /tmp/google-services.json android/app/google-services.json 2>/dev/null || true
-          # ضبط applicationId ليطابق Firebase com.kartak.app
-          sed -i 's/applicationId "com.kartak.kartak"/applicationId "com.kartak.app"/' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/namespace "com.kartak.kartak"/namespace "com.kartak.app"/' android/app/build.gradle 2>/dev/null || true
-          cat android/app/build.gradle | grep -A2 applicationId || true
+          echo "=== BEFORE fix ==="
+          cat android/app/build.gradle | grep -E "applicationId|namespace" || true
+          # إصلاح applicationId + namespace ليطابق Firebase com.kartak.app
+          sed -i 's/com\.kartak\.kartak/com.kartak.app/g' android/app/build.gradle || true
+          # في Flutter 3.22 قد يكون في android/local.properties أو build.gradle.kts
+          find android -name "*.gradle" -o -name "*.kts" | xargs sed -i 's/com\.kartak\.kartak/com.kartak.app/g' 2>/dev/null || true
+          echo "=== AFTER fix ==="
+          cat android/app/build.gradle | grep -E "applicationId|namespace" || true
+          # تأكد الأيقونة موجودة (ic_launcher هو الافتراضي)
+          ls android/app/src/main/res/mipmap-*/ 2>/dev/null || true
       - name: Install deps
         run: flutter pub get
+      - name: Generate launcher icons from logo.png
+        run: |
+          # لو logo.png موجود، ولّد launcher_icon، وإلا استخدم ic_launcher الافتراضي
+          if [ -f "assets/images/logo.png" ]; then
+            dart run flutter_launcher_icons || echo "launcher_icons failed, using default ic_launcher"
+            # لو فشل، ارجع للـ ic_launcher
+            if ! ls android/app/src/main/res/mipmap-*/launcher_icon.png 1>/dev/null 2>&1; then
+              sed -i 's/@mipmap\/launcher_icon/@mipmap\/ic_launcher/g' android/app/src/main/AndroidManifest.xml || true
+            fi
+          fi
+          cat android/app/src/main/AndroidManifest.xml | grep icon || true
       - name: Build APK (release)
         run: flutter build apk --release --split-per-abi
       - name: Build APK universal
