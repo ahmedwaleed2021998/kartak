@@ -19,31 +19,43 @@ jobs:
         run: |
           cp android/app/google-services.json /tmp/google-services.json 2>/dev/null || true
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml 2>/dev/null || true
+          cp -r android/app/src/main/res /tmp/res 2>/dev/null || true
+          cp assets/images/logo.png /tmp/logo.png 2>/dev/null || true
           flutter create . --project-name kartak --org com.kartak --platforms android
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml 2>/dev/null || true
           cp /tmp/google-services.json android/app/google-services.json 2>/dev/null || true
+          mkdir -p android/app/src/main/res
+          cp -r /tmp/res/* android/app/src/main/res/ 2>/dev/null || true
+          cp /tmp/logo.png assets/images/logo.png 2>/dev/null || true
           echo "=== BEFORE fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
-          # إصلاح applicationId فقط ليطابق Firebase com.kartak.app (لا نغير namespace حتى لا نكسر MainActivity)
-          # namespace يبقى com.kartak.kartak والـ MainActivity في com/kartak/kartak/
           sed -i 's/applicationId "com\.kartak\.kartak"/applicationId "com.kartak.app"/g' android/app/build.gradle || true
           echo "=== AFTER fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
-          ls android/app/src/main/kotlin/com/kartak/kartak/ 2>/dev/null || ls android/app/src/main/kotlin/com/kartak/app/ 2>/dev/null || echo "check MainActivity path"
-          # تأكد الأيقونة موجودة (ic_launcher هو الافتراضي)
-          ls android/app/src/main/res/mipmap-*/ 2>/dev/null || true
+          ls android/app/src/main/res/mipmap-*/ 2>/dev/null | head -20 || true
       - name: Install deps
         run: flutter pub get
-      - name: Generate launcher icons from logo.png
+      - name: Generate launcher icons from logo.png (PIL fallback)
         run: |
-          # لو logo.png موجود، ولّد launcher_icon، وإلا استخدم ic_launcher الافتراضي
           if [ -f "assets/images/logo.png" ]; then
-            dart run flutter_launcher_icons || echo "launcher_icons failed, using default ic_launcher"
-            # لو فشل، ارجع للـ ic_launcher
-            if ! ls android/app/src/main/res/mipmap-*/launcher_icon.png 1>/dev/null 2>&1; then
-              sed -i 's/@mipmap\/launcher_icon/@mipmap\/ic_launcher/g' android/app/src/main/AndroidManifest.xml || true
-            fi
+            echo "Generating launcher icons via Python PIL"
+            python3 -c "
+from PIL import Image
+import pathlib
+src = pathlib.Path('assets/images/logo.png')
+im = Image.open(src).convert('RGBA')
+sizes = {'mipmap-mdpi':48, 'mipmap-hdpi':72, 'mipmap-xhdpi':96, 'mipmap-xxhdpi':144, 'mipmap-xxxhdpi':192}
+base = pathlib.Path('android/app/src/main/res')
+for name, size in sizes.items():
+    d = base / name
+    d.mkdir(parents=True, exist_ok=True)
+    resized = im.resize((size, size), Image.LANCZOS)
+    resized.save(d / 'launcher_icon.png', 'PNG')
+    resized.save(d / 'ic_launcher.png', 'PNG')
+    print(f'{name} {size} ok')
+"
+            ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
           fi
           cat android/app/src/main/AndroidManifest.xml | grep icon || true
       - name: Build APK (release)
