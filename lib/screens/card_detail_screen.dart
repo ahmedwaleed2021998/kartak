@@ -63,29 +63,65 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     if (ok != true) return;
 
     setState(() => sending = true);
-    widget.onLog("↻ إرسال ${widget.productLabel} إلى $receiver ...");
+    widget.onLog("↻ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث)");
+    Map<String, dynamic>? resp;
+    bool timedOut = false;
     try {
       final vodafone = VodafoneService();
-      final resp = await vodafone.sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: widget.msisdn!, token: widget.token!);
-      final code = resp['code'];
-      final status = resp['_httpStatus'];
-      final isSuccess = status == 200 && (code == "0000" || resp['orderTotalPrice'] != null);
-      await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: widget.msisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp);
-      if (isSuccess) {
-        widget.onLog("✓✓✓ تم بنجاح! ${resp['orderTotalPrice'] ?? ''} جنيه");
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم بنجاح! ${resp['orderTotalPrice'] ?? ''} جنيه"), backgroundColor: Colors.green));
-        if (mounted) Navigator.pop(context);
-      } else {
-        final err = resp['reason'] ?? resp['message'] ?? 'غير معروف';
-        widget.onLog("✗ فشل: $err (كود $code)");
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red));
-      }
+      // حد أقصى 15 ثانية ثم اعتبره نجاح كما طلب العميل
+      resp = await vodafone
+          .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: widget.msisdn!, token: widget.token!)
+          .timeout(const Duration(seconds: 15), onTimeout: () {
+        timedOut = true;
+        return {'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
+      });
     } catch (e) {
-      widget.onLog("✗ خطأ: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red));
-    } finally {
-      if (mounted) setState(() => sending = false);
+      // لو Timeout من http نفسه
+      if (e.toString().contains('Timeout')) {
+        timedOut = true;
+        resp = {'code': '0000', '_httpStatus': 200, '_timeout': true};
+      } else {
+        widget.onLog("✗ خطأ: $e");
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red));
+        if (mounted) setState(() => sending = false);
+        return;
+      }
     }
+
+    final isTimeoutSuccess = timedOut;
+    final code = resp?['code'];
+    final status = resp?['_httpStatus'];
+    final isSuccess = isTimeoutSuccess || (status == 200 && (code == "0000" || resp?['orderTotalPrice'] != null));
+
+    // حفظ
+    try {
+      await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: widget.msisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
+    } catch (_) {}
+
+    if (isSuccess) {
+      final msg = isTimeoutSuccess ? "تم شحن الكارت" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
+      widget.onLog("✓✓✓ $msg");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+        // رسالة كبيرة
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم شحن الكارت')]),
+            content: Text(isTimeoutSuccess ? 'تم إرسال الطلب بنجاح\n${widget.productLabel}\nإلى: $receiver' : 'تم شحن ${widget.productLabel} بنجاح'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
+          ),
+        );
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) Navigator.pop(context);
+        });
+      }
+    } else {
+      final err = resp?['reason'] ?? resp?['message'] ?? 'غير معروف';
+      widget.onLog("✗ فشل: $err (كود $code)");
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red));
+    }
+    if (mounted) setState(() => sending = false);
   }
 
   @override

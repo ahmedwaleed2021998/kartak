@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final connected = msisdn != null && token != null;
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
@@ -244,19 +244,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(children: [
                     // اتصال
                     Card(
+                      color: const Color(0xFF1E293B),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text("① الاتصال بالمحفظة", style: TextStyle(fontWeight: FontWeight.bold)),
-                          const Text("لازم داتا فودافون أو VPN", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          const Text("① الاتصال بالمحفظة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                          const Text("لازم داتا فودافون أو VPN", style: TextStyle(color: Colors.white70, fontSize: 11)),
                           const SizedBox(height: 8),
                           Row(children: [
-                            Expanded(child: Text(connected ? "✓ $msisdn" : "● غير متصل", style: TextStyle(color: connected ? Colors.green : Colors.grey, fontWeight: FontWeight.bold))),
+                            Expanded(child: Text(connected ? "✓ $msisdn" : "● غير متصل", style: TextStyle(color: connected ? Colors.greenAccent : Colors.white60, fontWeight: FontWeight.bold))),
                             ElevatedButton(onPressed: connecting ? null : connect, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white), child: connecting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("↻ اتصال")),
                           ]),
-                          if (connected) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8)), child: Row(children: [const Icon(Icons.check_circle, color: Colors.green, size: 16), const SizedBox(width: 6), Expanded(child: Text("رقم المحفظة: $msisdn - الجلسة نشطة", style: const TextStyle(color: Colors.green, fontSize: 12)))])),
-                          if (!connected) const Padding(padding: EdgeInsets.only(top: 8), child: Text("⚠️ اتصل أولاً ثم اضغط على أي كارت", style: TextStyle(color: Colors.orange, fontSize: 11))),
+                          if (connected) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.shade900.withOpacity(0.5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)), child: Row(children: [const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16), const SizedBox(width: 6), Expanded(child: Text("رقم المحفظة: $msisdn - الجلسة نشطة", style: const TextStyle(color: Colors.greenAccent, fontSize: 12)))])),
+                          if (!connected) const Padding(padding: EdgeInsets.only(top: 8), child: Text("⚠️ اتصل أولاً ثم اضغط على أي كارت", style: TextStyle(color: Colors.orangeAccent, fontSize: 11))),
                         ]),
                       ),
                     ),
@@ -284,6 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () => openCard(pid, name, number),
                           borderRadius: BorderRadius.circular(16),
                           child: Card(
+                            color: const Color(0xFF1E293B),
                             elevation: 3,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             clipBehavior: Clip.antiAlias,
@@ -307,14 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   padding: const EdgeInsets.all(8),
                                   child: Column(children: [
                                     Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      VodafoneService.getUnits(pid).isNotEmpty ? VodafoneService.getUnits(pid) : "اضغط للتفاصيل",
-                                      style: TextStyle(color: VodafoneService.getUnits(pid).isNotEmpty ? const Color(0xFF059669) : Colors.grey, fontSize: 10, fontWeight: FontWeight.bold),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
                                     const Spacer(),
                                     Container(
                                       width: double.infinity,
