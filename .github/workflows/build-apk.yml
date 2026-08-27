@@ -25,12 +25,12 @@ jobs:
           cp /tmp/google-services.json android/app/google-services.json 2>/dev/null || true
           echo "=== BEFORE fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
-          # إصلاح applicationId + namespace ليطابق Firebase com.kartak.app
-          sed -i 's/com\.kartak\.kartak/com.kartak.app/g' android/app/build.gradle || true
-          # في Flutter 3.22 قد يكون في android/local.properties أو build.gradle.kts
-          find android -name "*.gradle" -o -name "*.kts" | xargs sed -i 's/com\.kartak\.kartak/com.kartak.app/g' 2>/dev/null || true
+          # إصلاح applicationId فقط ليطابق Firebase com.kartak.app (لا نغير namespace حتى لا نكسر MainActivity)
+          # namespace يبقى com.kartak.kartak والـ MainActivity في com/kartak/kartak/
+          sed -i 's/applicationId "com\.kartak\.kartak"/applicationId "com.kartak.app"/g' android/app/build.gradle || true
           echo "=== AFTER fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
+          ls android/app/src/main/kotlin/com/kartak/kartak/ 2>/dev/null || ls android/app/src/main/kotlin/com/kartak/app/ 2>/dev/null || echo "check MainActivity path"
           # تأكد الأيقونة موجودة (ic_launcher هو الافتراضي)
           ls android/app/src/main/res/mipmap-*/ 2>/dev/null || true
       - name: Install deps
