@@ -38,25 +38,25 @@ jobs:
         run: flutter pub get
       - name: Generate launcher icons from logo.png (PIL fallback)
         run: |
-          if [ -f "assets/images/logo.png" ]; then
-            echo "Generating launcher icons via Python PIL"
-            python3 << 'PY'
-            from PIL import Image
-            import pathlib
-            src = pathlib.Path('assets/images/logo.png')
-            im = Image.open(src).convert('RGBA')
-            sizes = {'mipmap-mdpi':48, 'mipmap-hdpi':72, 'mipmap-xhdpi':96, 'mipmap-xxhdpi':144, 'mipmap-xxxhdpi':192}
-            base = pathlib.Path('android/app/src/main/res')
-            for name, size in sizes.items():
-                d = base / name
-                d.mkdir(parents=True, exist_ok=True)
-                resized = im.resize((size, size), Image.LANCZOS)
-                resized.save(d / 'launcher_icon.png', 'PNG')
-                resized.save(d / 'ic_launcher.png', 'PNG')
-                print(name, size, 'ok')
-            PY
-            ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
-          fi
+          if [ ! -f "assets/images/logo.png" ]; then echo "no logo"; exit 0; fi
+          echo "Generating launcher icons via Python PIL"
+          cat > /tmp/gen_icons.py << 'PY'
+          from PIL import Image
+          import pathlib
+          src = pathlib.Path('assets/images/logo.png')
+          im = Image.open(src).convert('RGBA')
+          sizes = {'mipmap-mdpi':48, 'mipmap-hdpi':72, 'mipmap-xhdpi':96, 'mipmap-xxhdpi':144, 'mipmap-xxxhdpi':192}
+          base = pathlib.Path('android/app/src/main/res')
+          for name, size in sizes.items():
+              d = base / name
+              d.mkdir(parents=True, exist_ok=True)
+              resized = im.resize((size, size), Image.LANCZOS)
+              resized.save(d / 'launcher_icon.png', 'PNG')
+              resized.save(d / 'ic_launcher.png', 'PNG')
+              print(name, size, 'ok')
+          PY
+          python3 /tmp/gen_icons.py
+          ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
           cat android/app/src/main/AndroidManifest.xml | grep icon || true
       - name: Build APK (release)
         run: flutter build apk --release --split-per-abi
