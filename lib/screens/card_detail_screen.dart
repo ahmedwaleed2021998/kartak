@@ -210,9 +210,27 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     }
 
     final isTimeoutSuccess = timedOut;
-    final code = resp?['code'];
+    final code = resp?['code']?.toString();
     final status = resp?['_httpStatus'];
-    final isSuccess = isTimeoutSuccess || (status == 200 && (code == "0000" || resp?['orderTotalPrice'] != null));
+    // نجاح موسع: 0000 أو orderTotalPrice أو orderId/id أو state completed أو 2xx مع عدم وجود رسالة خطأ واضحة
+    bool isSuccess = isTimeoutSuccess;
+    if (!isSuccess && status != null && status >= 200 && status < 300) {
+      if (code == "0000" || resp?['orderTotalPrice'] != null) {
+        isSuccess = true;
+      } else if (resp?['orderId'] != null || (resp?['id'] != null && resp?['id'].toString().isNotEmpty)) {
+        isSuccess = true;
+      } else if (resp?['state']?.toString().toLowerCase() == 'completed' || resp?['status']?.toString().toLowerCase() == 'completed') {
+        isSuccess = true;
+      } else {
+        try {
+          final oi = resp?['orderItem'];
+          if (oi is List && oi.isNotEmpty) {
+            final s = oi[0]['state']?.toString().toLowerCase();
+            if (s == 'completed' || s == 'active' || s == 'inprogress') isSuccess = true;
+          }
+        } catch (_) {}
+      }
+    }
 
     // حفظ
     try {
@@ -261,8 +279,8 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Row(children: [Icon(Icons.error, color: Colors.red), SizedBox(width: 8), Text('فشل الشحن')]),
-            content: SingleChildScrollView(child: Text("السبب: $err\n\nكود: $code\nHTTP: $status\n\nالرد الكامل:\n${resp.toString().substring(0, resp.toString().length > 800 ? 800 : resp.toString().length)}", style: const TextStyle(fontSize: 12))),
+            title: const Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text('تنبيه - تحقق من الرصيد')]),
+            content: SingleChildScrollView(child: Text("الكارت قد يكون اتشحن بالفعل رغم ظهور الخطأ.\nتحقق من رصيد المستلم قبل إعادة المحاولة.\n\nالسبب: $err\n\nكود: $code\nHTTP: $status\n\nالرد الكامل:\n${resp.toString().substring(0, resp.toString().length > 600 ? 600 : resp.toString().length)}", style: const TextStyle(fontSize: 12))),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
           ),
         );
