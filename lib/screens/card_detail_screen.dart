@@ -217,7 +217,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     if (!isSuccess && status != null && status >= 200 && status < 300) {
       if (code == "0000" || resp?['orderTotalPrice'] != null) {
         isSuccess = true;
-      } else if (resp?['orderId'] != null || (resp?['id'] != null && resp?['id'].toString().isNotEmpty)) {
+      } else if (resp?['orderId'] != null || resp?['id']?.toString().isNotEmpty == true) {
         isSuccess = true;
       } else if (resp?['state']?.toString().toLowerCase() == 'completed' || resp?['status']?.toString().toLowerCase() == 'completed') {
         isSuccess = true;
