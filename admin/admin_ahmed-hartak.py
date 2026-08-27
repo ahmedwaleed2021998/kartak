@@ -4,7 +4,9 @@ import threading
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 import email.utils
+import re
 
 import customtkinter as ctk
 from tkinter import messagebox
@@ -14,6 +16,15 @@ DB_URL = "https://ahmed-hartak-default-rtdb.firebaseio.com"
 USERS_PATH = "users"
 # ==========================================
 
+def encode_email(email):
+    # Firebase لا يسمح بـ . في المفاتيح -> نستبدل . بـ ,
+    return email.strip().lower().replace('.', ',')
+
+def decode_email(key):
+    return key.replace(',', '.')
+
+def is_valid_email(email):
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email.strip()))
 
 def hash_password(password):
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
@@ -39,85 +50,109 @@ def get_all_users():
         return None
 
 
-def register_user(username, password, days, hours, minutes):
+def register_user(email, password, days, hours, minutes):
+    if not is_valid_email(email):
+        return False, "البريد الإلكتروني غير صحيح"
     total_seconds = days * 86400 + hours * 3600 + minutes * 60
     now = get_google_timestamp()
-    data = {"password": hash_password(password), "created": now, "expires": now + total_seconds}
-    url = f"{DB_URL}/{USERS_PATH}/{username}.json"
+    data = {"email": email.strip().lower(), "password": hash_password(password), "created": now, "expires": now + total_seconds}
+    key = encode_email(email)
+    url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(key, safe=',')}.json"
     body = json.dumps(data).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="PUT")
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "Account created successfully!"
+        return True, "تم إنشاء الحساب بنجاح!"
     except urllib.error.HTTPError as e:
         return False, f"Server error ({e.code}). Check the write rules."
     except Exception:
         return False, "Could not connect to the database."
 
 
-def renew_user(username, days, hours, minutes):
+def renew_user(email, days, hours, minutes):
     users = get_all_users()
     if users is None:
         return False, "Could not connect to the database."
-    user = users.get(username)
+    key = encode_email(email)
+    user = users.get(key)
     if user is None:
-        return False, "Username does not exist."
+        # جرب البحث بالإيميل الأصلي للتوافق مع الحسابات القديمة بالـ username
+        user = users.get(email.strip())
+        if user is not None:
+            key = email.strip()
+        else:
+            return False, "البريد غير موجود"
 
     now = get_google_timestamp()
     extra = days * 86400 + hours * 3600 + minutes * 60
     if isinstance(user, dict):
         current_expires = user.get("expires")
     else:
-        user = {"password": user}
+        user = {"password": user, "email": email.strip().lower()}
         current_expires = None
     base = max(now, current_expires or now)
     user["expires"] = base + extra
+    if "email" not in user:
+        user["email"] = email.strip().lower()
 
-    url = f"{DB_URL}/{USERS_PATH}/{username}.json"
+    url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(key, safe=',')}.json"
     req = urllib.request.Request(
         url, data=json.dumps(user).encode("utf-8"), method="PUT"
     )
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "Subscription extended successfully!"
+        return True, "تم تمديد الاشتراك بنجاح!"
     except urllib.error.HTTPError as e:
         return False, f"Server error ({e.code}). Check the write rules."
     except Exception:
         return False, "Could not connect to the database."
 
 
-def change_password(username, new_password):
+def change_password(email, new_password):
     users = get_all_users()
     if users is None:
         return False, "Could not connect to the database."
-    user = users.get(username)
+    key = encode_email(email)
+    user = users.get(key)
     if user is None:
-        return False, "Username does not exist."
+        user = users.get(email.strip())
+        if user is not None:
+            key = email.strip()
+        else:
+            return False, "البريد غير موجود"
 
     if isinstance(user, dict):
         user["password"] = hash_password(new_password)
     else:
-        user = {"password": hash_password(new_password)}
+        user = {"password": hash_password(new_password), "email": email.strip().lower()}
+    if "email" not in user:
+        user["email"] = email.strip().lower()
 
-    url = f"{DB_URL}/{USERS_PATH}/{username}.json"
+    url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(key, safe=',')}.json"
     req = urllib.request.Request(
         url, data=json.dumps(user).encode("utf-8"), method="PUT"
     )
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "Password changed successfully!"
+        return True, "تم تغيير كلمة السر بنجاح!"
     except urllib.error.HTTPError as e:
         return False, f"Server error ({e.code}). Check the write rules."
     except Exception:
         return False, "Could not connect to the database."
 
 
-def delete_user(username):
-    url = f"{DB_URL}/{USERS_PATH}/{username}.json"
+def delete_user(email):
+    key = encode_email(email)
+    # جرب المفتاحين
+    users = get_all_users()
+    actual_key = key
+    if users is not None and key not in users and email.strip() in users:
+        actual_key = email.strip()
+    url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(actual_key, safe=',')}.json"
     req = urllib.request.Request(url, method="DELETE")
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "User deleted successfully!"
+        return True, "تم حذف المستخدم بنجاح!"
     except urllib.error.HTTPError as e:
         return False, f"Server error ({e.code}). Check the write rules."
     except Exception:
@@ -125,11 +160,16 @@ def delete_user(username):
 
 
 class UserPopup(ctk.CTkToplevel):
-    def __init__(self, master, username, on_change=None):
+    def __init__(self, master, email_key, on_change=None):
         super().__init__(master)
-        self.username = username
+        # email_key هو المفتاح المشفر في Firebase
+        self.email_key = email_key
+        self.email_display = decode_email(email_key) if ',' in email_key else email_key
+        # لو كان username قديم بدون @، اعرضه كما هو
+        if '@' not in self.email_display:
+            self.email_display = email_key
         self.on_change = on_change
-        self.title(f"User: {username}")
+        self.title(f"User: {self.email_display}")
         self.geometry("360x460")
         self.resizable(False, False)
 
@@ -137,7 +177,7 @@ class UserPopup(ctk.CTkToplevel):
         container.pack(fill="both", expand=True, padx=16, pady=16)
 
         ctk.CTkLabel(
-            container, text=username, font=("Arial", 20, "bold")
+            container, text=self.email_display, font=("Arial", 14, "bold"), wraplength=320
         ).pack(pady=(0, 12))
 
         ctk.CTkLabel(
@@ -203,9 +243,9 @@ class UserPopup(ctk.CTkToplevel):
         elif new != confirm:
             msg, ok = "Passwords do not match.", False
         else:
-            ok, msg = change_password(self.username, new)
-        self._set_msg(self.pw_msg, msg, ok)
-        self.btn_pw.configure(state="normal")
+            ok, msg = change_password(self.email_display, new)
+        self.after(0, lambda: self._set_msg(self.pw_msg, msg, ok))
+        self.after(0, lambda: self.btn_pw.configure(state="normal"))
 
     def _start_extend(self):
         self._set_msg(self.ext_msg, "Loading...")
@@ -225,15 +265,15 @@ class UserPopup(ctk.CTkToplevel):
             if d + h + m <= 0:
                 msg, ok = "Extra time must be greater than zero.", False
             else:
-                ok, msg = renew_user(self.username, d, h, m)
-        self._set_msg(self.ext_msg, msg, ok)
-        self.btn_extend.configure(state="normal")
+                ok, msg = renew_user(self.email_display, d, h, m)
+        self.after(0, lambda: self._set_msg(self.ext_msg, msg, ok))
+        self.after(0, lambda: self.btn_extend.configure(state="normal"))
         if ok and self.on_change:
-            self.on_change()
+            self.after(0, self.on_change)
 
     def _start_delete(self):
         if not messagebox.askyesno(
-            "Confirm Delete", f"Delete user '{self.username}'?"
+            "Confirm Delete", f"Delete user '{self.email_display}'?"
         ):
             return
         self._set_msg(self.del_msg, "Loading...")
@@ -241,12 +281,12 @@ class UserPopup(ctk.CTkToplevel):
         threading.Thread(target=self._delete_worker, daemon=True).start()
 
     def _delete_worker(self):
-        ok, msg = delete_user(self.username)
-        self._set_msg(self.del_msg, msg, ok)
-        self.btn_delete.configure(state="normal")
+        ok, msg = delete_user(self.email_display)
+        self.after(0, lambda: self._set_msg(self.del_msg, msg, ok))
+        self.after(0, lambda: self.btn_delete.configure(state="normal"))
         if ok:
             if self.on_change:
-                self.on_change()
+                self.after(0, self.on_change)
             self.after(800, self.destroy)
 
 
@@ -292,8 +332,8 @@ class AdminApp(ctk.CTk):
             self.tab_create, text="Create Account", font=("Arial", 22, "bold")
         ).grid(row=0, column=0, columnspan=6, pady=(20, 15))
 
-        self.c_user = self._entry_row(
-            self.tab_create, 1, "Username", None, plc="Choose username"
+        self.c_email = self._entry_row(
+            self.tab_create, 1, "Email", None, plc="example@mail.com"
         )
         self.c_pass = self._entry_row(
             self.tab_create, 3, "Password", None, show="\u2022", plc="Choose password"
@@ -341,8 +381,8 @@ class AdminApp(ctk.CTk):
             self.tab_extend, text="Extend Time", font=("Arial", 22, "bold")
         ).grid(row=0, column=0, columnspan=6, pady=(20, 15))
 
-        self.e_user = self._entry_row(
-            self.tab_extend, 1, "Username", None, plc="Existing username"
+        self.e_email = self._entry_row(
+            self.tab_extend, 1, "Email", None, plc="user@mail.com"
         )
 
         ctk.CTkLabel(self.tab_extend, text="Extra Time", font=("Arial", 13)).grid(
@@ -382,7 +422,7 @@ class AdminApp(ctk.CTk):
         self.tab_users.grid_rowconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            self.tab_users, text="Users", font=("Arial", 22, "bold")
+            self.tab_users, text="Users (Email)", font=("Arial", 22, "bold")
         ).grid(row=0, column=0, columnspan=6, pady=(20, 15))
 
         self.users_frame = ctk.CTkScrollableFrame(
@@ -420,12 +460,14 @@ class AdminApp(ctk.CTk):
         threading.Thread(target=self._create_worker, daemon=True).start()
 
     def _create_worker(self):
-        username = self.c_user.get().strip()
+        email = self.c_email.get().strip().lower()
         password = self.c_pass.get()
         confirm = self.c_confirm.get()
 
-        if not username or not password:
-            msg, ok = "Please enter username and password.", False
+        if not email or not password:
+            msg, ok = "Please enter email and password.", False
+        elif not is_valid_email(email):
+            msg, ok = "البريد غير صحيح", False
         elif password != confirm:
             msg, ok = "Passwords do not match.", False
         else:
@@ -436,13 +478,13 @@ class AdminApp(ctk.CTk):
                 users = get_all_users()
                 if users is None:
                     msg, ok = "Could not connect to the database.", False
-                elif username in users:
-                    msg, ok = "Username already exists.", False
+                elif encode_email(email) in users or email in users:
+                    msg, ok = "Email already exists.", False
                 else:
-                    ok, msg = register_user(username, password, *time_val)
+                    ok, msg = register_user(email, password, *time_val)
 
-        self._set_message(self.c_msg, msg, ok)
-        self.btn_create.configure(state="normal")
+        self.after(0, lambda: self._set_message(self.c_msg, msg, ok))
+        self.after(0, lambda: self.btn_create.configure(state="normal"))
 
     def _start_extend(self):
         self._set_message(self.e_msg, "Loading...")
@@ -450,24 +492,29 @@ class AdminApp(ctk.CTk):
         threading.Thread(target=self._extend_worker, daemon=True).start()
 
     def _extend_worker(self):
-        username = self.e_user.get().strip()
-        if not username:
-            msg, ok = "Please enter a username.", False
+        email = self.e_email.get().strip().lower()
+        if not email:
+            msg, ok = "Please enter an email.", False
+        elif not is_valid_email(email):
+            msg, ok = "البريد غير صحيح", False
         else:
             time_val, err = self._read_time(self.e_days, self.e_hours, self.e_minutes)
             if err:
                 msg, ok = err, False
             else:
-                ok, msg = renew_user(username, *time_val)
+                ok, msg = renew_user(email, *time_val)
 
-        self._set_message(self.e_msg, msg, ok)
-        self.btn_extend.configure(state="normal")
+        self.after(0, lambda: self._set_message(self.e_msg, msg, ok))
+        self.after(0, lambda: self.btn_extend.configure(state="normal"))
 
     def _refresh_users(self):
         threading.Thread(target=self._refresh_worker, daemon=True).start()
 
     def _refresh_worker(self):
         users = get_all_users()
+        self.after(0, lambda: self._render_users(users))
+
+    def _render_users(self, users):
         self.users_frame._parent_canvas.yview_moveto(0.0)
         for widget in self.users_frame.winfo_children():
             widget.destroy()
@@ -482,7 +529,11 @@ class AdminApp(ctk.CTk):
             ).pack(pady=10)
         else:
             now = get_google_timestamp()
-            for name, user in users.items():
+            for key, user in users.items():
+                # decode email for display
+                display_email = decode_email(key) if ',' in key or '@' in key else key
+                if isinstance(user, dict) and 'email' in user:
+                    display_email = user.get('email', display_email)
                 expires = user.get("expires") if isinstance(user, dict) else None
                 if expires is None:
                     status = "no expiry"
@@ -494,15 +545,14 @@ class AdminApp(ctk.CTk):
 
                 btn = ctk.CTkButton(
                     self.users_frame,
-                    text=f"{name}  |  {status}",
+                    text=f"{display_email}  |  {status}",
                     anchor="w",
-                    command=lambda n=name: self._open_user_popup(n),
+                    command=lambda k=key: self._open_user_popup(k),
                 )
-                btn.grid(row=len(self.users_frame.winfo_children()), column=0,
-                         sticky="ew", padx=5, pady=3)
+                btn.pack(fill="x", padx=5, pady=3)
 
-    def _open_user_popup(self, username):
-        UserPopup(self, username, on_change=self._refresh_users)
+    def _open_user_popup(self, email_key):
+        UserPopup(self, email_key, on_change=self._refresh_users)
 
 
 if __name__ == "__main__":

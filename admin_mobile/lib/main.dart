@@ -42,7 +42,7 @@ class _AdminHomeState extends State<AdminHome> with SingleTickerProviderStateMix
           const SizedBox(width: 8),
           const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('كروت وشحن - Admin', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            Text('ahmed-hartak', style: TextStyle(fontSize: 10, color: Colors.white70)),
+            Text('ahmed-hartak - إيميل وباسورد', style: TextStyle(fontSize: 10, color: Colors.white70)),
           ]),
         ]),
         bottom: TabBar(controller: tab, labelColor: Colors.white, unselectedLabelColor: Colors.white60, indicatorColor: const Color(0xFFE11D48), tabs: const [
@@ -63,7 +63,7 @@ class CreateTab extends StatefulWidget {
 }
 
 class _CreateTabState extends State<CreateTab> {
-  final user = TextEditingController();
+  final email = TextEditingController();
   final pass = TextEditingController();
   final confirm = TextEditingController();
   final days = TextEditingController(text: '30');
@@ -74,8 +74,12 @@ class _CreateTabState extends State<CreateTab> {
   bool ok = false;
 
   Future<void> submit() async {
-    if (user.text.trim().isEmpty || pass.text.isEmpty) {
-      setState(() { msg = 'ادخل المستخدم وكلمة السر'; ok = false; });
+    if (email.text.trim().isEmpty || pass.text.isEmpty) {
+      setState(() { msg = 'ادخل الإيميل وكلمة السر'; ok = false; });
+      return;
+    }
+    if (!AdminService.isValidEmail(email.text.trim())) {
+      setState(() { msg = 'البريد غير صحيح'; ok = false; });
       return;
     }
     if (pass.text != confirm.text) {
@@ -95,11 +99,12 @@ class _CreateTabState extends State<CreateTab> {
       setState(() { msg = 'تعذر الاتصال'; ok = false; loading = false; });
       return;
     }
-    if (users.containsKey(user.text.trim())) {
-      setState(() { msg = 'المستخدم موجود بالفعل'; ok = false; loading = false; });
+    final key = AdminService.encodeEmail(email.text.trim());
+    if (users.containsKey(key) || users.containsKey(email.text.trim())) {
+      setState(() { msg = 'الإيميل موجود بالفعل'; ok = false; loading = false; });
       return;
     }
-    final (success, message) = await AdminService.registerUser(user.text.trim(), pass.text, d, h, m);
+    final (success, message) = await AdminService.registerUser(email.text.trim(), pass.text, d, h, m);
     setState(() { msg = message; ok = success; loading = false; });
   }
 
@@ -108,9 +113,9 @@ class _CreateTabState extends State<CreateTab> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(children: [
-        const Text('إنشاء حساب', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Text('إنشاء حساب (إيميل)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        TextField(controller: user, decoration: const InputDecoration(labelText: 'اسم المستخدم', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', hintText: 'example@mail.com', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email))),
         const SizedBox(height: 10),
         TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة السر', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
         const SizedBox(height: 10),
@@ -140,7 +145,7 @@ class ExtendTab extends StatefulWidget {
 }
 
 class _ExtendTabState extends State<ExtendTab> {
-  final user = TextEditingController();
+  final email = TextEditingController();
   final days = TextEditingController(text: '0');
   final hours = TextEditingController(text: '0');
   final minutes = TextEditingController(text: '0');
@@ -149,8 +154,12 @@ class _ExtendTabState extends State<ExtendTab> {
   bool ok = false;
 
   Future<void> submit() async {
-    if (user.text.trim().isEmpty) {
-      setState(() { msg = 'ادخل اسم المستخدم'; ok = false; });
+    if (email.text.trim().isEmpty) {
+      setState(() { msg = 'ادخل الإيميل'; ok = false; });
+      return;
+    }
+    if (!AdminService.isValidEmail(email.text.trim())) {
+      setState(() { msg = 'البريد غير صحيح'; ok = false; });
       return;
     }
     final d = int.tryParse(days.text) ?? -1;
@@ -161,7 +170,7 @@ class _ExtendTabState extends State<ExtendTab> {
       return;
     }
     setState(() { loading = true; msg = 'جاري...'; });
-    final (success, message) = await AdminService.renewUser(user.text.trim(), d, h, m);
+    final (success, message) = await AdminService.renewUser(email.text.trim(), d, h, m);
     setState(() { msg = message; ok = success; loading = false; });
   }
 
@@ -170,9 +179,9 @@ class _ExtendTabState extends State<ExtendTab> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(children: [
-        const Text('تمديد الاشتراك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Text('تمديد الاشتراك (إيميل)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        TextField(controller: user, decoration: const InputDecoration(labelText: 'اسم المستخدم', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', hintText: 'user@mail.com', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email))),
         const SizedBox(height: 16),
         const Text('المدة الإضافية', style: TextStyle(fontWeight: FontWeight.bold)),
         Row(children: [
@@ -218,6 +227,12 @@ class _UsersTabState extends State<UsersTab> {
     }
   }
 
+  String displayEmail(String key, Map<String, dynamic> user) {
+    if (user.containsKey('email')) return user['email'];
+    if (key.contains(',')) return AdminService.decodeEmail(key);
+    return key;
+  }
+
   String statusText(Map<String, dynamic> user) {
     final expires = user['expires'] as int?;
     if (expires == null) return 'بدون انتهاء';
@@ -255,16 +270,17 @@ class _UsersTabState extends State<UsersTab> {
         child: ListView.builder(
           itemCount: users!.length,
           itemBuilder: (c, i) {
-            final name = users!.keys.elementAt(i);
-            final user = users![name] is Map ? Map<String, dynamic>.from(users![name]) : <String, dynamic>{'password': users![name].toString()};
+            final key = users!.keys.elementAt(i);
+            final user = users![key] is Map ? Map<String, dynamic>.from(users![key]) : <String, dynamic>{'password': users![key].toString()};
+            final email = displayEmail(key, user);
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: ListTile(
-                leading: CircleAvatar(backgroundColor: statusColor(user), child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
-                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(statusText(user), style: TextStyle(color: statusColor(user))),
+                leading: CircleAvatar(backgroundColor: statusColor(user), child: Text(email[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
+                title: Text(email, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text(statusText(user), style: TextStyle(color: statusColor(user), fontSize: 12)),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => showUserDialog(name),
+                onTap: () => showUserDialog(key),
               ),
             );
           },
@@ -273,12 +289,15 @@ class _UsersTabState extends State<UsersTab> {
     ]);
   }
 
-  void showUserDialog(String username) {
+  void showUserDialog(String key) {
     final pwNew = TextEditingController();
     final pwConfirm = TextEditingController();
     final d = TextEditingController(text: '0');
     final h = TextEditingController(text: '0');
     final m = TextEditingController(text: '0');
+    final usersMap = users!;
+    final userData = usersMap[key] is Map ? Map<String, dynamic>.from(usersMap[key]) : <String, dynamic>{};
+    final email = userData.containsKey('email') ? userData['email'] : (key.contains(',') ? AdminService.decodeEmail(key) : key);
 
     showDialog(
       context: context,
@@ -291,7 +310,7 @@ class _UsersTabState extends State<UsersTab> {
         bool extOk = false;
 
         return AlertDialog(
-          title: Text(username, textAlign: TextAlign.center),
+          title: Text(email, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text('تغيير كلمة السر', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -312,7 +331,7 @@ class _UsersTabState extends State<UsersTab> {
                           return;
                         }
                         setState(() { pwLoading = true; pwMsg = 'جاري...'; });
-                        final (ok, msg) = await AdminService.changePassword(username, pwNew.text);
+                        final (ok, msg) = await AdminService.changePassword(email, pwNew.text);
                         setState(() { pwMsg = msg; pwOk = ok; pwLoading = false; });
                         if (ok) refresh();
                       },
@@ -341,7 +360,7 @@ class _UsersTabState extends State<UsersTab> {
                           return;
                         }
                         setState(() { extLoading = true; extMsg = 'جاري...'; });
-                        final (ok, msg) = await AdminService.renewUser(username, dd, hh, mm);
+                        final (ok, msg) = await AdminService.renewUser(email, dd, hh, mm);
                         setState(() { extMsg = msg; extOk = ok; extLoading = false; });
                         if (ok) refresh();
                       },
@@ -352,9 +371,9 @@ class _UsersTabState extends State<UsersTab> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                 onPressed: () async {
-                  final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text('حذف؟'), content: Text('حذف $username؟'), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف'))]));
+                  final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text('حذف؟'), content: Text('حذف $email؟'), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف'))]));
                   if (ok == true) {
-                    final (success, msg) = await AdminService.deleteUser(username);
+                    final (success, msg) = await AdminService.deleteUser(email);
                     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: success ? Colors.green : Colors.red));
                     if (success) {
                       if (context.mounted) Navigator.pop(context);
