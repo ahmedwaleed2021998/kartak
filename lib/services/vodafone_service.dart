@@ -31,6 +31,25 @@ class VodafoneService {
 
   static String getUnits(String productId) => units[productId] ?? "";
 
+  // مسار صورة الكارت - لو موجودة في assets/images/cards/<productId>.png وإلا fallback لـ logo.png
+  static String cardAsset(String productId) => 'assets/images/cards/$productId.png';
+  static const hasCustomImage = {
+    "Fakka_2.5_Unite",
+    "Fakka_4.25_Unite",
+    "Fakka_5_Unite",
+    "Fakka_6_NewUnite",
+    "Fakka_9_Unite",
+    "Fakka_10.5_Unite",
+    "Fakka_12_Unite",
+    "Fakka_13.5_Unite",
+    "Fakka_15_Unite",
+    "Fakka_15_NewUnite",
+    "Fakka_15.5_Unite",
+    "Fakka_17.5_Unite",
+    "Fakka_20_Unite",
+    "Fakka_26_Unite",
+  };
+
   // المنتجات - نفس PRODUCTS في البايثون
   static const products = [
     ("1", "فكة 2.5 جنيه", "Fakka_2.5_Unite"),

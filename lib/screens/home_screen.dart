@@ -290,19 +290,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             clipBehavior: Clip.antiAlias,
                             child: Column(children: [
-                              // صورة القالب - كل الكروت بنفس الصورة الفينتاج
-                              Container(
+                              // صورة القالب - صورة مخصصة لكل كارت وإلا fallback للوجو
+                              SizedBox(
                                 height: 110,
                                 width: double.infinity,
-                                decoration: BoxDecoration(
+                                child: ClipRRect(
                                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                  image: const DecorationImage(image: AssetImage('assets/images/logo.png'), fit: BoxFit.cover),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/cards/$pid.png',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                                      ),
+                                      Container(color: Colors.black.withOpacity(0.12)),
+                                      Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
+                                      Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
+                                    ],
+                                  ),
                                 ),
-                                child: Stack(children: [
-                                  Container(decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(16)), color: Colors.black.withOpacity(0.15))),
-                                  Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
-                                  Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
-                                ]),
                               ),
                               Expanded(
                                 child: Padding(

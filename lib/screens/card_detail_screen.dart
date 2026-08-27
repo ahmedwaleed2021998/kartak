@@ -135,14 +135,29 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // صورة كبيرة
-          Container(
-            height: 140,
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFB90A1A), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16)),
-            child: Stack(alignment: Alignment.center, children: [
-              Image.asset('assets/images/logo.png', height: 90, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white, size: 50)),
-              Positioned(top: 10, right: 10, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(widget.number, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
-            ]),
+          // صورة كبيرة - صورة الكارت المخصصة وإلا fallback
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              color: const Color(0xFF1E293B),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/images/cards/${widget.productId}.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB90A1A), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                      child: Center(child: Image.asset('assets/images/logo.png', height: 90, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white, size: 50))),
+                    ),
+                  ),
+                  Container(color: Colors.black.withOpacity(0.05)),
+                  Positioned(top: 10, right: 10, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(widget.number, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Card(
