@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
 
@@ -18,6 +21,99 @@ class _HomeScreenState extends State<HomeScreen> {
   String? token;
   String? seamless;
   bool connecting = false;
+  bool checkingSub = true;
+  bool expired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSubscription();
+  }
+
+  Future<void> _checkSubscription() async {
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (email == null) {
+      setState(() { checkingSub = false; });
+      return;
+    }
+    try {
+      final key = email.trim().toLowerCase().replaceAll('.', ',');
+      final url = Uri.parse('https://ahmed-hartak-default-rtdb.firebaseio.com/users/${Uri.encodeComponent(key)}.json');
+      final resp = await http.get(url).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.body != 'null' && resp.body.isNotEmpty) {
+        final data = jsonDecode(resp.body);
+        final expires = data is Map ? data['expires'] as int? : null;
+        if (expires != null) {
+          final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          // جرب وقت جوجل لو أمكن
+          int nowTs = now;
+          try {
+            final g = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 5));
+            final d = g.headers['date'];
+            if (d != null) nowTs = DateTime.parse(d).millisecondsSinceEpoch ~/ 1000;
+          } catch (_) {}
+          if (expires <= nowTs) {
+            setState(() { expired = true; checkingSub = false; });
+            if (mounted) _showExpiredDialog();
+            return;
+          }
+        }
+      } else {
+        // لو المستخدم مش موجود في DB اعتبره منتهي
+        // لكن نسمح للأدمن يجرب - فقط لو فيه users
+      }
+    } catch (_) {}
+    if (mounted) setState(() { checkingSub = false; });
+  }
+
+  void _showExpiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Row(children: [Icon(Icons.block, color: Colors.red), SizedBox(width: 8), Text('اشتراكك انتهي')]),
+          content: const Text('اشتراكك انتهي تواصل مع المطور لتجديد الاشتراك', style: TextStyle(fontSize: 16)),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) Navigator.of(context).pop();
+              },
+              child: const Text('خروج'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+              onPressed: () async {
+                final uri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+                try {
+                  if (await canLaunchUrl(uri)) {
+                    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (ok) return;
+                  }
+                } catch (_) {}
+                // fallback Chrome
+                await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true));
+              },
+              icon: const Icon(Icons.chat),
+              label: const Text('تواصل مع المطور'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _contactExpired() async {
+    final uri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى');
+    try {
+      if (await canLaunchUrl(uri)) {
+        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      }
+    } catch (_) {}
+    await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true));
+  }
   String selectedProductLabel = VodafoneService.products.first.$2; // اسم أول منتج
   String get selectedProductId {
     final e = VodafoneService.products.firstWhere((p) => p.$2 == selectedProductLabel, orElse: () => VodafoneService.products.first);
@@ -116,10 +212,45 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async { await FirebaseAuth.instance.signOut(); }, icon: const Icon(Icons.logout)),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
+      body: checkingSub
+          ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+          : expired
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Card(
+                      color: Colors.red.shade50,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.block, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          const Text('اشتراكك انتهي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
+                          const SizedBox(height: 8),
+                          const Text('تواصل مع المطور لتجديد الاشتراك', textAlign: TextAlign.center),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                              onPressed: _contactExpired,
+                              icon: const Icon(Icons.chat),
+                              label: const Text('تواصل مع المطور - واتساب'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(onPressed: () async => await FirebaseAuth.instance.signOut(), child: const Text('تسجيل خروج')),
+                        ]),
+                      ),
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
             // 1 اتصال
             _card(children: [
               _title("① الاتصال بالمحفظة", "لازم داتا فودافون أو VPN"),
