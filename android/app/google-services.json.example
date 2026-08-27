@@ -1,0 +1,30 @@
+{
+  "_comment": "ضع ملف google-services.json الحقيقي هنا. هذا مثال فقط - احذف هذا الملف وسمّي الحقيقي google-services.json",
+  "project_info": {
+    "project_number": "REPLACE",
+    "project_id": "kartek-app",
+    "storage_bucket": "kartek-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_WITH_APP_ID",
+        "android_client_info": {
+          "package_name": "com.kartek.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
