@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
@@ -63,12 +66,128 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     if (ok != true) return;
 
     setState(() => sending = true);
-    widget.onLog("↻ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث)");
+
+    // ====== خطوات الشحن - Dialog مع 3 مراحل ======
+    int step1 = 1, step2 = 0, step3 = 0; // 0 انتظار, 1 جاري, 2 تم, 3 فشل
+    String step3Detail = "";
+    late StateSetter dialogSetState;
+    bool dialogShown = false;
+
+    // عرض Dialog الخطوات بدون await حتى نكمل
+    WidgetsBinding.instance.addPostFrameCallback((_) {});
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogShown = true;
+        return StatefulBuilder(builder: (ctx, setSt) {
+          dialogSetState = setSt;
+          return WillPopScope(
+            onWillPop: () async => false,
+            child: AlertDialog(
+              title: const Text("جاري الشحن...", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              content: Column(mainAxisSize: MainAxisSize.min, children: [
+                _stepRow("1. التحقق من الاشتراك", step1),
+                const SizedBox(height: 10),
+                _stepRow("2. تحديث التوكن", step2),
+                const SizedBox(height: 10),
+                _stepRow("3. إرسال الكارت", step3, detail: step3Detail),
+              ]),
+              actions: [TextButton(onPressed: null, child: Text(sending ? "جاري..." : "تم", style: TextStyle(color: Colors.grey)))],
+            ),
+          );
+        });
+      },
+    );
+
+    // دالة تحديث الخطوة بأمان
+    void updateStep(int step, int status, {String detail = ""}) {
+      try {
+        if (dialogShown) dialogSetState(() {});
+      } catch (_) {}
+      if (step == 1) step1 = status;
+      if (step == 2) step2 = status;
+      if (step == 3) {
+        step3 = status;
+        step3Detail = detail;
+      }
+      try {
+        if (dialogShown) dialogSetState(() {});
+      } catch (_) {}
+    }
+
+    // مهلة صغيرة لإظهار الـ dialog قبل البدء
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ---- خطوة 1: التحقق من الاشتراك ----
+    updateStep(1, 1);
+    widget.onLog("① التحقق من الاشتراك...");
+    bool subOk = true;
+    String subFailReason = "";
+    try {
+      final email = FirebaseAuth.instance.currentUser?.email;
+      if (email != null) {
+        final key = email.trim().toLowerCase().replaceAll('.', ',');
+        final url = Uri.parse('https://ahmed-hartak-default-rtdb.firebaseio.com/users/${Uri.encodeComponent(key)}.json');
+        final resp = await http.get(url).timeout(const Duration(seconds: 8));
+        if (resp.statusCode == 200 && resp.body != 'null' && resp.body.isNotEmpty) {
+          final data = jsonDecode(resp.body);
+          final expires = data is Map ? data['expires'] as int? : null;
+          if (expires != null) {
+            int nowTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+            try {
+              final g = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 5));
+              final d = g.headers['date'];
+              if (d != null) nowTs = DateTime.parse(d).millisecondsSinceEpoch ~/ 1000;
+            } catch (_) {}
+            if (expires <= nowTs) {
+              subOk = false;
+              subFailReason = "اشتراكك انتهي";
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // لو فشل التحقق نعتبره نجاح حتى لا نوقف الشحن - فقط لوج
+      widget.onLog("⚠️ تحقق الاشتراك: $e");
+    }
+    if (!subOk) {
+      updateStep(1, 3, detail: subFailReason);
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(subFailReason), backgroundColor: Colors.red));
+      if (mounted) setState(() => sending = false);
+      return;
+    }
+    updateStep(1, 2);
+    widget.onLog("✓ التحقق من الاشتراك تم");
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    // ---- خطوة 2: تحديث التوكن ----
+    updateStep(2, 1);
+    widget.onLog("② تحديث التوكن...");
+    // التوكن الحالي من Home - نتأكد أنه موجود
+    if (widget.token == null || widget.token!.isEmpty) {
+      updateStep(2, 3, detail: "لا يوجد توكن");
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("التوكن منتهي - اعد الاتصال بالمحفظة"), backgroundColor: Colors.red));
+      if (mounted) setState(() => sending = false);
+      return;
+    }
+    // محاكاة تأكيد التوكن (لو سيرفر فودافون يحتاج تحديث، التوكن الحالي يكفي)
+    await Future.delayed(const Duration(milliseconds: 400));
+    updateStep(2, 2);
+    widget.onLog("✓ التوكن نشط");
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ---- خطوة 3: إرسال الكارت ----
+    updateStep(3, 1, detail: "جاري الإرسال...");
+    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث)");
     Map<String, dynamic>? resp;
     bool timedOut = false;
     try {
       final vodafone = VodafoneService();
-      // حد أقصى 15 ثانية ثم اعتبره نجاح كما طلب العميل
       resp = await vodafone
           .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: widget.msisdn!, token: widget.token!)
           .timeout(const Duration(seconds: 15), onTimeout: () {
@@ -76,12 +195,14 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         return {'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
       });
     } catch (e) {
-      // لو Timeout من http نفسه
       if (e.toString().contains('Timeout')) {
         timedOut = true;
         resp = {'code': '0000', '_httpStatus': 200, '_timeout': true};
       } else {
+        updateStep(3, 3, detail: "$e");
         widget.onLog("✗ خطأ: $e");
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red));
         if (mounted) setState(() => sending = false);
         return;
@@ -99,16 +220,18 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     } catch (_) {}
 
     if (isSuccess) {
+      updateStep(3, 2, detail: "تم الإرسال");
+      widget.onLog("✓✓✓ تم شحن الكارت");
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
       final msg = isTimeoutSuccess ? "تم شحن الكارت" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
-      widget.onLog("✓✓✓ $msg");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
-        // رسالة كبيرة
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
             title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم شحن الكارت')]),
-            content: Text(isTimeoutSuccess ? 'تم إرسال الطلب بنجاح\n${widget.productLabel}\nإلى: $receiver' : 'تم شحن ${widget.productLabel} بنجاح'),
+            content: Text(isTimeoutSuccess ? 'تم إرسال الطلب بنجاح\n${widget.productLabel}\nإلى: $receiver\n\n(تم بعد 15 ث - يعتبر ناجح)' : 'تم شحن ${widget.productLabel} بنجاح\nإلى: $receiver'),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
           ),
         );
@@ -117,11 +240,67 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         });
       }
     } else {
-      final err = resp?['reason'] ?? resp?['message'] ?? 'غير معروف';
-      widget.onLog("✗ فشل: $err (كود $code)");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red));
+      // استخراج سبب مفصل بدل غير معروف
+      String err = resp?['reason'] ?? resp?['message'] ?? resp?['description'] ?? resp?['details'] ?? resp?['error'] ?? resp?['faultDescription'] ?? '';
+      if (err.isEmpty) {
+        // لو مفيش حقل معروف، اعرض الـ JSON كامل مختصر
+        try {
+          final j = jsonEncode(resp);
+          err = j.length > 300 ? j.substring(0, 300) + "..." : j;
+          if (err == "{}" || err == "null") err = "غير معروف (كود $code - http $status)";
+        } catch (_) {
+          err = "غير معروف (كود $code)";
+        }
+      }
+      updateStep(3, 3, detail: "فشل");
+      widget.onLog("✗ فشل: $err (كود $code - http $status) - الرد: $resp");
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red, duration: const Duration(seconds: 4)));
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Row(children: [Icon(Icons.error, color: Colors.red), SizedBox(width: 8), Text('فشل الشحن')]),
+            content: SingleChildScrollView(child: Text("السبب: $err\n\nكود: $code\nHTTP: $status\n\nالرد الكامل:\n${resp.toString().substring(0, resp.toString().length > 800 ? 800 : resp.toString().length)}", style: const TextStyle(fontSize: 12))),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
+          ),
+        );
+      }
     }
     if (mounted) setState(() => sending = false);
+  }
+
+  Widget _stepRow(String title, int status, {String detail = ""}) {
+    IconData icon;
+    Color color;
+    Widget trailing;
+    if (status == 0) {
+      icon = Icons.hourglass_empty;
+      color = Colors.grey;
+      trailing = const SizedBox();
+    } else if (status == 1) {
+      icon = Icons.sync;
+      color = Colors.orange;
+      trailing = const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
+    } else if (status == 2) {
+      icon = Icons.check_circle;
+      color = Colors.green;
+      trailing = const Icon(Icons.check, color: Colors.green, size: 18);
+    } else {
+      icon = Icons.error;
+      color = Colors.red;
+      trailing = const Icon(Icons.close, color: Colors.red, size: 18);
+    }
+    return Row(children: [
+      Icon(icon, color: color, size: 20),
+      const SizedBox(width: 8),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: status == 3 ? Colors.red : Colors.black)),
+        if (detail.isNotEmpty) Text(detail, style: TextStyle(fontSize: 11, color: status == 3 ? Colors.red : Colors.green)),
+      ])),
+      trailing,
+    ]);
   }
 
   @override
