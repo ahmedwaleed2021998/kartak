@@ -35,21 +35,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _contactDeveloper() async {
-    final uri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى');
+    // رابط مباشر يفتح في كروم حتى لو واتساب مش متثبت
+    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20');
     try {
-      // جرب واتساب أولاً
-      if (await canLaunchUrl(uri)) {
-        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (ok) return;
-      }
+      // حاول فتح في المتصفح الخارجي (كروم)
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (ok) return;
     } catch (_) {}
-    // fallback: افتح في كروم
-    final chromeUri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى');
     try {
-      await launchUrl(chromeUri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true));
-    } catch (_) {
-      // آخر حل: جرب المتصفح الخارجي
-      await launchUrl(chromeUri, mode: LaunchMode.platformDefault);
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
+      return;
+    } catch (_) {}
+    try {
+      await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر فتح الرابط: $e')));
     }
   }
 

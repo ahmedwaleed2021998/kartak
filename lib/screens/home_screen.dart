@@ -103,9 +103,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
               onPressed: () async {
-                final uri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
-                try { if (await canLaunchUrl(uri)) { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } } catch (_) {}
-                await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true));
+                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+                try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
+                try { if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return; } catch (_) {}
+                await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
               },
               icon: const Icon(Icons.chat),
               label: const Text('تواصل مع المطور'),
@@ -117,9 +118,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _contactExpired() async {
-    final uri = Uri.parse('https://wa.me/201098969844?text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى');
-    try { if (await canLaunchUrl(uri)) { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } } catch (_) {}
-    await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true));
+    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {}
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return;
+    } catch (_) {}
+    await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
   }
 
   Future<void> connect() async {
