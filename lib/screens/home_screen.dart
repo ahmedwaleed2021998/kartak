@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
+import 'card_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,33 +25,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool checkingSub = true;
   bool expired = false;
 
-  // لكل كارت: controller للرقم والباس
-  final Map<String, TextEditingController> receiverCtrls = {};
-  final Map<String, TextEditingController> pinCtrls = {};
-  final Map<String, bool> showPin = {};
-  final Map<String, bool> sending = {};
-  final Map<String, bool> toSelf = {};
-
   List<String> logs = [];
 
   @override
   void initState() {
     super.initState();
-    for (var p in VodafoneService.products) {
-      receiverCtrls[p.$3] = TextEditingController();
-      pinCtrls[p.$3] = TextEditingController();
-      showPin[p.$3] = false;
-      sending[p.$3] = false;
-      toSelf[p.$3] = true;
-    }
     _checkSubscription();
-  }
-
-  @override
-  void dispose() {
-    for (var c in receiverCtrls.values) c.dispose();
-    for (var c in pinCtrls.values) c.dispose();
-    super.dispose();
   }
 
   void addLog(String m) => setState(() => logs.insert(0, "[${TimeOfDay.now().format(context)}] $m"));
@@ -119,12 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _contactExpired() async {
     final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
-    try {
-      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-    } catch (_) {}
-    try {
-      if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return;
-    } catch (_) {}
+    try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
+    try { if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return; } catch (_) {}
     await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
   }
 
@@ -146,59 +122,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> sendFor(String productId, String productLabel) async {
-    final isSelf = toSelf[productId] ?? true;
-    final recvCtrl = receiverCtrls[productId]!;
-    final pinCtrl = pinCtrls[productId]!;
-    final receiver = isSelf ? msisdn! : recvCtrl.text.trim();
-    final pin = pinCtrl.text.trim();
-
+  void openCard(String productId, String productName, String number) {
     if (msisdn == null || token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("اتصل بالمحفظة أولاً")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("اتصل بالمحفظة أولاً"), backgroundColor: Colors.orange));
       return;
     }
-    if (!isSelf && !(receiver.startsWith("01") && receiver.length == 11 && int.tryParse(receiver) != null)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("رقم المستلم خطأ - 11 رقم يبدأ 01")));
-      return;
-    }
-    if (pin.length != 6 || int.tryParse(pin) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("PIN لازم 6 أرقام")));
-      return;
-    }
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("تأكيد التحويل"),
-        content: Text("الكارت: $productLabel\nالمرسل: $msisdn\nالمستلم: $receiver\n\nسيتم الخصم فوراً"),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")), ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("أوافق"))],
+    final label = "$number - $productName";
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CardDetailScreen(
+          productId: productId,
+          productLabel: label,
+          productName: productName,
+          number: number,
+          msisdn: msisdn,
+          token: token,
+          onLog: addLog,
+        ),
       ),
     );
-    if (ok != true) return;
-
-    setState(() => sending[productId] = true);
-    addLog("↻ إرسال $productLabel إلى $receiver ...");
-    try {
-      final resp = await vodafone.sendOrder(productId: productId, receiver: receiver, pin: pin, msisdn: msisdn!, token: token!);
-      final code = resp['code'];
-      final status = resp['_httpStatus'];
-      final isSuccess = status == 200 && (code == "0000" || resp['orderTotalPrice'] != null);
-      final statusStr = isSuccess ? "success" : "failed";
-      await firestore.saveOrder(productName: productLabel, productId: productId, sender: msisdn!, receiver: receiver, status: statusStr, serverResponse: resp);
-      if (isSuccess) {
-        addLog("✓✓✓ تم بنجاح! ${resp['orderTotalPrice'] ?? ''} جنيه");
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم بنجاح! ${resp['orderTotalPrice'] ?? ''} جنيه"), backgroundColor: Colors.green));
-      } else {
-        final err = resp['reason'] ?? resp['message'] ?? 'غير معروف';
-        addLog("✗ فشل: $err (كود $code)");
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red));
-      }
-    } catch (e) {
-      addLog("✗ خطأ: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red));
-    } finally {
-      setState(() => sending[productId] = false);
-    }
   }
 
   @override
@@ -271,17 +214,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ElevatedButton(onPressed: connecting ? null : connect, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white), child: connecting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("↻ اتصال")),
                           ]),
                           if (connected) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8)), child: Row(children: [const Icon(Icons.check_circle, color: Colors.green, size: 16), const SizedBox(width: 6), Expanded(child: Text("رقم المحفظة: $msisdn - الجلسة نشطة", style: const TextStyle(color: Colors.green, fontSize: 12)))])),
+                          if (!connected) const Padding(padding: EdgeInsets.only(top: 8), child: Text("⚠️ اتصل أولاً ثم اضغط على أي كارت", style: TextStyle(color: Colors.orange, fontSize: 11))),
                         ]),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // شبكة الكروت
+                    // شبكة الكروت - كل كارت قالب
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        childAspectRatio: 0.62,
+                        childAspectRatio: 0.78,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
                       ),
@@ -289,54 +233,48 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, idx) {
                         final p = VodafoneService.products[idx];
                         final pid = p.$3;
-                        final label = "${p.$1} - ${p.$2}";
-                        final price = p.$2.replaceAll(RegExp(r'[^0-9.]'), '').trim();
-                        return Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(children: [
-                            // صورة الكارت
-                            Container(
-                              height: 90,
-                              width: double.infinity,
-                              decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB90A1A), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-                              child: Stack(alignment: Alignment.center, children: [
-                                Image.asset('assets/images/logo.png', height: 70, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white, size: 40)),
-                                Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text("${p.$1}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
-                              ]),
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                                  Text(p.$2, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  if (price.isNotEmpty) Text("$price جنيه", style: const TextStyle(color: Color(0xFFE11D48), fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                                  const SizedBox(height: 6),
-                                  // لنفسي / لرقم آخر
-                                  Row(children: [
-                                    Expanded(child: InkWell(onTap: () => setState(() => toSelf[pid] = true), child: Container(padding: const EdgeInsets.symmetric(vertical: 4), decoration: BoxDecoration(color: (toSelf[pid] ?? true) ? const Color(0xFFE11D48) : Colors.grey.shade200, borderRadius: BorderRadius.circular(6)), child: Text("لنفسي", textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: (toSelf[pid] ?? true) ? Colors.white : Colors.black, fontWeight: FontWeight.bold))))),
-                                    const SizedBox(width: 4),
-                                    Expanded(child: InkWell(onTap: () => setState(() => toSelf[pid] = false), child: Container(padding: const EdgeInsets.symmetric(vertical: 4), decoration: BoxDecoration(color: !(toSelf[pid] ?? true) ? const Color(0xFF0F172A) : Colors.grey.shade200, borderRadius: BorderRadius.circular(6)), child: Text("لرقم آخر", textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: !(toSelf[pid] ?? true) ? Colors.white : Colors.black, fontWeight: FontWeight.bold))))),
-                                  ]),
-                                  const SizedBox(height: 6),
-                                  if (!(toSelf[pid] ?? true))
-                                    SizedBox(height: 36, child: TextField(controller: receiverCtrls[pid], keyboardType: TextInputType.phone, style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: "01xxxxxxxxx", prefixIcon: Icon(Icons.phone, size: 16), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), isDense: true))),
-                                  if (!(toSelf[pid] ?? true)) const SizedBox(height: 6),
-                                  SizedBox(height: 36, child: TextField(controller: pinCtrls[pid], keyboardType: TextInputType.number, maxLength: 6, obscureText: !(showPin[pid] ?? false), style: const TextStyle(fontSize: 12), decoration: InputDecoration(counterText: "", hintText: "PIN 6 أرقام", prefixIcon: const Icon(Icons.lock, size: 16), suffixIcon: InkWell(onTap: () => setState(() => showPin[pid] = !(showPin[pid] ?? false)), child: Icon((showPin[pid] ?? false) ? Icons.visibility_off : Icons.visibility, size: 16)), border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), isDense: true))),
-                                  const SizedBox(height: 6),
-                                  SizedBox(
-                                    height: 36,
-                                    child: ElevatedButton(
-                                      onPressed: (connected && !(sending[pid] ?? false)) ? () => sendFor(pid, label) : null,
-                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: EdgeInsets.zero),
-                                      child: (sending[pid] ?? false) ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("⚡ إرسال", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ),
+                        final name = p.$2;
+                        final number = p.$1;
+                        // الواحدات مكتوبة على الكارت من بره
+                        final isFakka = name.contains("فكة");
+                        final isMared = name.contains("مارد");
+                        return InkWell(
+                          onTap: () => openCard(pid, name, number),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Card(
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(children: [
+                              // صورة + وحدات
+                              Container(
+                                height: 110,
+                                width: double.infinity,
+                                decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB90A1A), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                                child: Stack(alignment: Alignment.center, children: [
+                                  Image.asset('assets/images/logo.png', height: 62, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white, size: 36)),
+                                  Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
+                                  Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.35), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
                                 ]),
                               ),
-                            ),
-                          ]),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(children: [
+                                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const Spacer(),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 6),
+                                      decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)),
+                                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.touch_app, color: Colors.white, size: 14), SizedBox(width: 4), Text("اضغط للشحن", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))]),
+                                    ),
+                                    if (!connected) const Padding(padding: EdgeInsets.only(top: 4), child: Text("غير متصل", style: TextStyle(color: Colors.red, fontSize: 9))),
+                                  ]),
+                                ),
+                              ),
+                            ]),
+                          ),
                         );
                       },
                     ),
@@ -387,7 +325,4 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
     );
   }
-
-  Widget _card({required List<Widget> children}) => Card(margin: const EdgeInsets.only(bottom: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children)));
-  Widget _title(String t, String? sub) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(fontWeight: FontWeight.bold)), if (sub != null) Text(sub, style: const TextStyle(color: Colors.grey, fontSize: 11))]);
 }
