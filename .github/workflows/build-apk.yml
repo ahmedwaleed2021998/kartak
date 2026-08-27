@@ -37,6 +37,32 @@ jobs:
           echo "=== AFTER fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
           ls android/app/src/main/res/mipmap-*/ 2>/dev/null | head -20 || true
+          echo "=== تفعيل تشفير R8/ProGuard - تصعيب فك التطبيق ==="
+          # إنشاء proguard-rules.pro لو غير موجود
+          cat > android/app/proguard-rules.pro << 'PROEOF'
+          -keep class io.flutter.app.** { *; }
+          -keep class io.flutter.plugin.** { *; }
+          -keep class io.flutter.util.** { *; }
+          -keep class io.flutter.view.** { *; }
+          -keep class io.flutter.** { *; }
+          -keep class io.flutter.plugins.** { *; }
+          -keep class com.google.firebase.** { *; }
+          -keep class com.google.android.gms.** { *; }
+          -dontwarn com.google.firebase.**
+          -dontwarn com.google.android.gms.**
+          PROEOF
+          # تفعيل minify و shrink في build.gradle
+          if ! grep -q "minifyEnabled true" android/app/build.gradle; then
+            sed -i 's/minifyEnabled false/minifyEnabled true/g' android/app/build.gradle || true
+            if ! grep -q "minifyEnabled" android/app/build.gradle; then
+              sed -i '/buildTypes {/{n;s/release {/release {\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile('\''proguard-android-optimize.txt'\''), '\''proguard-rules.pro'\''/}' android/app/build.gradle || true
+            fi
+          fi
+          sed -i 's/shrinkResources false/shrinkResources true/g' android/app/build.gradle || true
+          if ! grep -q "shrinkResources" android/app/build.gradle; then
+            sed -i 's/minifyEnabled true/minifyEnabled true\n            shrinkResources true/' android/app/build.gradle || true
+          fi
+          cat android/app/build.gradle | grep -A2 -E "minifyEnabled|shrinkResources|proguardFiles" || true
       - name: Install deps
         run: flutter pub get
       - name: Generate launcher icons from logo.png (PIL fallback)
@@ -62,10 +88,10 @@ jobs:
           python3 /tmp/gen_icons.py
           ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
           cat android/app/src/main/AndroidManifest.xml | grep icon || true
-      - name: Build APK (release)
-        run: flutter build apk --release --split-per-abi
-      - name: Build APK universal
-        run: flutter build apk --release
+      - name: Build APK (release) - مشفر ومحمي
+        run: flutter build apk --release --obfuscate --split-debug-info=./symbols --split-per-abi
+      - name: Build APK universal - مشفر
+        run: flutter build apk --release --obfuscate --split-debug-info=./symbols
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

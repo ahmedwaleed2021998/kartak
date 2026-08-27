@@ -163,33 +163,48 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     widget.onLog("✓ التحقق من الاشتراك تم");
     await Future.delayed(const Duration(milliseconds: 350));
 
-    // ---- خطوة 2: تحديث التوكن ----
-    updateStep(2, 1);
-    widget.onLog("② تحديث التوكن...");
-    // التوكن الحالي من Home - نتأكد أنه موجود
-    if (widget.token == null || widget.token!.isEmpty) {
-      updateStep(2, 3, detail: "لا يوجد توكن");
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("التوكن منتهي - اعد الاتصال بالمحفظة"), backgroundColor: Colors.red));
-      if (mounted) setState(() => sending = false);
-      return;
+    // ---- خطوة 2: الاتصال بالمحفظة / تحديث التوكن (تلقائي قبل الشحن) ----
+    updateStep(2, 1, detail: "جاري الاتصال...");
+    widget.onLog("② الاتصال بالمحفظة / تحديث التوكن...");
+    String? curMsisdn = widget.msisdn;
+    String? curToken = widget.token;
+    // لو غير متصل، اتصل تلقائياً قبل الشحن
+    if (curMsisdn == null || curToken == null || curToken.isEmpty) {
+      try {
+        final vodafoneConn = VodafoneService();
+        widget.onLog("↻ محاولة اتصال تلقائي بالمحفظة...");
+        final res = await vodafoneConn.getSeamless().timeout(const Duration(seconds: 15));
+        curMsisdn = res.msisdn;
+        widget.onLog("✓ seamless تم: $curMsisdn");
+        final t = await vodafoneConn.getToken(res.seamless).timeout(const Duration(seconds: 15));
+        curToken = t;
+        widget.onLog("✓ التوكن تم: ${t.substring(0, 20)}...");
+        updateStep(2, 2, detail: "تم: $curMsisdn");
+      } catch (e) {
+        updateStep(2, 3, detail: "$e");
+        widget.onLog("✗ فشل الاتصال التلقائي: $e");
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل الاتصال بالمحفظة: $e - تأكد من داتا فودافون أو VPN"), backgroundColor: Colors.red, duration: const Duration(seconds: 4)));
+        if (mounted) setState(() => sending = false);
+        return;
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 300));
+      updateStep(2, 2, detail: "التوكن نشط");
+      widget.onLog("✓ التوكن نشط: $curMsisdn");
     }
-    // محاكاة تأكيد التوكن (لو سيرفر فودافون يحتاج تحديث، التوكن الحالي يكفي)
-    await Future.delayed(const Duration(milliseconds: 400));
-    updateStep(2, 2);
-    widget.onLog("✓ التوكن نشط");
     await Future.delayed(const Duration(milliseconds: 300));
 
     // ---- خطوة 3: إرسال الكارت ----
     updateStep(3, 1, detail: "جاري الإرسال...");
-    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث)");
+    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث) من $curMsisdn");
     Map<String, dynamic>? resp;
     bool timedOut = false;
     try {
       final vodafone = VodafoneService();
       resp = await vodafone
-          .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: widget.msisdn!, token: widget.token!)
+          .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!)
           .timeout(const Duration(seconds: 15), onTimeout: () {
         timedOut = true;
         return {'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
@@ -234,7 +249,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
 
     // حفظ
     try {
-      await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: widget.msisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
+      await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
     } catch (_) {}
 
     if (isSuccess) {
