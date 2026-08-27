@@ -40,21 +40,21 @@ jobs:
         run: |
           if [ -f "assets/images/logo.png" ]; then
             echo "Generating launcher icons via Python PIL"
-            python3 -c "
-from PIL import Image
-import pathlib
-src = pathlib.Path('assets/images/logo.png')
-im = Image.open(src).convert('RGBA')
-sizes = {'mipmap-mdpi':48, 'mipmap-hdpi':72, 'mipmap-xhdpi':96, 'mipmap-xxhdpi':144, 'mipmap-xxxhdpi':192}
-base = pathlib.Path('android/app/src/main/res')
-for name, size in sizes.items():
-    d = base / name
-    d.mkdir(parents=True, exist_ok=True)
-    resized = im.resize((size, size), Image.LANCZOS)
-    resized.save(d / 'launcher_icon.png', 'PNG')
-    resized.save(d / 'ic_launcher.png', 'PNG')
-    print(f'{name} {size} ok')
-"
+            python3 << 'PY'
+            from PIL import Image
+            import pathlib
+            src = pathlib.Path('assets/images/logo.png')
+            im = Image.open(src).convert('RGBA')
+            sizes = {'mipmap-mdpi':48, 'mipmap-hdpi':72, 'mipmap-xhdpi':96, 'mipmap-xxhdpi':144, 'mipmap-xxxhdpi':192}
+            base = pathlib.Path('android/app/src/main/res')
+            for name, size in sizes.items():
+                d = base / name
+                d.mkdir(parents=True, exist_ok=True)
+                resized = im.resize((size, size), Image.LANCZOS)
+                resized.save(d / 'launcher_icon.png', 'PNG')
+                resized.save(d / 'ic_launcher.png', 'PNG')
+                print(name, size, 'ok')
+            PY
             ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
           fi
           cat android/app/src/main/AndroidManifest.xml | grep icon || true
