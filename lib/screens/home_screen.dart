@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
+import '../services/device_service.dart';
 import 'card_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => checkingSub = false);
       return;
     }
+    // تحقق انتهاء الاشتراك
     try {
       final key = email.trim().toLowerCase().replaceAll('.', ',');
       final url = Uri.parse('https://ahmed-hartak-default-rtdb.firebaseio.com/users/${Uri.encodeComponent(key)}.json');
@@ -66,7 +68,47 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (_) {}
+    // تحقق ربط الجهاز - إيميل = جهاز واحد فقط
+    final emailForDevice = FirebaseAuth.instance.currentUser?.email;
+    if (emailForDevice != null) {
+      final deviceCheck = await DeviceService.checkAndBindDevice(emailForDevice);
+      if (!deviceCheck.$1) {
+        setState(() {
+          expired = true;
+          checkingSub = false;
+        });
+        if (mounted) _showDeviceBlockedDialog(deviceCheck.$2);
+        return;
+      }
+    }
     if (mounted) setState(() => checkingSub = false);
+  }
+
+  void _showDeviceBlockedDialog(String msg) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Row(children: [Icon(Icons.phonelink_erase, color: Colors.red), SizedBox(width: 8), Text('الجهاز غير مصرح')]),
+          content: Text('هذا الإيميل مربوط بجهاز آخر\n$msg\nتواصل مع المطور لفك الربط', style: const TextStyle(fontSize: 14)),
+          actions: [
+            TextButton(onPressed: () async { await FirebaseAuth.instance.signOut(); if (context.mounted) Navigator.of(context).pop(); }, child: const Text('خروج')),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+              onPressed: () async {
+                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20إيميلي%20مربوط%20بجهاز%20آخر%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+                try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
+                await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
+              },
+              icon: const Icon(Icons.chat),
+              label: const Text('تواصل لفك الربط'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showExpiredDialog() {
@@ -262,6 +304,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   padding: const EdgeInsets.all(8),
                                   child: Column(children: [
                                     Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      VodafoneService.getUnits(pid).isNotEmpty ? VodafoneService.getUnits(pid) : "اضغط للتفاصيل",
+                                      style: TextStyle(color: VodafoneService.getUnits(pid).isNotEmpty ? const Color(0xFF059669) : Colors.grey, fontSize: 10, fontWeight: FontWeight.bold),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     const Spacer(),
                                     Container(
                                       width: double.infinity,

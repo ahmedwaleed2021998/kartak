@@ -15,6 +15,22 @@ class VodafoneService {
     'device-id': 'b26ba335813fad21',
   };
 
+  // الوحدات تحت الاسم (من العميل)
+  static const units = {
+    "Fakka_2.5_Unite": "45 وحدة • يوم",
+    "Fakka_4.25_Unite": "190 وحدة • يوم",
+    "Fakka_5_Unite": "80 وحدة • 2 يوم",
+    "Fakka_6_NewUnite": "225 وحدة • 2 يوم",
+    "Fakka_9_Unite": "400 وحدة • 4 أيام",
+    "Fakka_10_Unite": "300 وحدة • 2 يوم",
+    "Fakka_10.5_Unite": "400 وحدة • 6 أيام",
+    "Fakka_12_Unite": "425 وحدة • 7 أيام",
+    "Fakka_13.5_Unite": "625 وحدة • 7 أيام",
+    "Fakka_20_Unite": "750 وحدة • 10 أيام",
+  };
+
+  static String getUnits(String productId) => units[productId] ?? "";
+
   // المنتجات - نفس PRODUCTS في البايثون
   static const products = [
     ("1", "فكة 2.5 جنيه", "Fakka_2.5_Unite"),
