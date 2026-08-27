@@ -5,10 +5,27 @@ import 'package:http/http.dart' as http;
 class AdminService {
   static const dbUrl = 'https://ahmed-hartak-default-rtdb.firebaseio.com';
   static const usersPath = 'users';
+  static const apiKey = 'AIzaSyBUzyV0L-0e-EW9egYcagSzrP_ke2dcGhg';
 
   static String encodeEmail(String email) => email.trim().toLowerCase().replaceAll('.', ',');
   static String decodeEmail(String key) => key.replaceAll(',', '.');
   static bool isValidEmail(String email) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.trim());
+
+  static Future<(bool, String)> createAuthUser(String email, String password) async {
+    final url = Uri.parse('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey');
+    try {
+      final resp = await http.post(url, headers: {'Content-Type': 'application/json'}, body: jsonEncode({"email": email, "password": password, "returnSecureToken": true})).timeout(const Duration(seconds: 15));
+      final data = jsonDecode(resp.body);
+      if (resp.statusCode == 200) return (true, data['localId'] ?? '');
+      final msg = data['error']?['message'] ?? resp.body;
+      if (msg.contains('EMAIL_EXISTS')) return (false, 'البريد موجود بالفعل في Authentication');
+      if (msg.contains('WEAK_PASSWORD')) return (false, 'كلمة السر ضعيفة');
+      if (msg.contains('INVALID_EMAIL')) return (false, 'البريد غير صحيح');
+      return (false, 'Auth: $msg');
+    } catch (_) {
+      return (false, 'تعذر الاتصال بـ Auth');
+    }
+  }
 
   static String hashPassword(String password) {
     return sha256.convert(utf8.encode(password)).toString();
@@ -38,17 +55,21 @@ class AdminService {
 
   static Future<(bool, String)> registerUser(String email, String password, int days, int hours, int minutes) async {
     if (!isValidEmail(email)) return (false, 'البريد غير صحيح');
+    // 1) إنشاء في Authentication (يظهر في console.firebase.google.com/project/ahmed-hartak/authentication/users)
+    final (okAuth, msgAuth) = await createAuthUser(email.trim().toLowerCase(), password);
+    if (!okAuth) return (false, msgAuth);
+    // 2) إنشاء في Realtime Database مع الانتهاء
     final total = days * 86400 + hours * 3600 + minutes * 60;
     final now = await getGoogleTimestamp();
-    final data = {"email": email.trim().toLowerCase(), "password": hashPassword(password), "created": now, "expires": now + total};
+    final data = {"email": email.trim().toLowerCase(), "password": hashPassword(password), "created": now, "expires": now + total, "authUid": msgAuth};
     final key = encodeEmail(email);
     final url = Uri.parse('$dbUrl/$usersPath/${Uri.encodeComponent(key)}.json');
     try {
       final resp = await http.put(url, body: jsonEncode(data)).timeout(const Duration(seconds: 15));
-      if (resp.statusCode == 200) return (true, 'تم إنشاء الحساب بنجاح!');
-      return (false, 'خطأ سيرفر (${resp.statusCode})');
+      if (resp.statusCode == 200) return (true, 'تم في Authentication و Database!');
+      return (false, 'تم في Auth لكن فشل Database (${resp.statusCode})');
     } catch (_) {
-      return (false, 'تعذر الاتصال بقاعدة البيانات');
+      return (false, 'تم في Auth لكن تعذر Database');
     }
   }
 

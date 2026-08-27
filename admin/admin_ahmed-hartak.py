@@ -14,7 +14,37 @@ from tkinter import messagebox
 # ====== مشروع كروت وشحن - ahmed-hartak ======
 DB_URL = "https://ahmed-hartak-default-rtdb.firebaseio.com"
 USERS_PATH = "users"
+FIREBASE_API_KEY = "AIzaSyBUzyV0L-0e-EW9egYcagSzrP_ke2dcGhg"  # من google-services.json
 # ==========================================
+
+def create_firebase_auth_user(email, password):
+    """ينشئ المستخدم في Firebase Authentication (يظهر في console.firebase.google.com/project/ahmed-hartak/authentication/users)"""
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
+    body = json.dumps({"email": email, "password": password, "returnSecureToken": True}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return True, data.get("localId", "")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        try:
+            j = json.loads(err_body)
+            msg = j.get("error", {}).get("message", err_body)
+        except:
+            msg = err_body
+        if "EMAIL_EXISTS" in msg:
+            return False, "البريد موجود بالفعل في Authentication"
+        if "WEAK_PASSWORD" in msg:
+            return False, "كلمة السر ضعيفة (6 أحرف على الأقل)"
+        if "INVALID_EMAIL" in msg:
+            return False, "البريد غير صحيح"
+        return False, f"Auth error: {msg}"
+    except Exception as ex:
+        return False, f"Auth error: {str(ex)}"
+
+def delete_firebase_auth_user_note():
+    return "ملاحظة: حذف Authentication يحتاج حذف يدوي من الكونسول أو Admin SDK"
 
 def encode_email(email):
     # Firebase لا يسمح بـ . في المفاتيح -> نستبدل . بـ ,
@@ -53,20 +83,25 @@ def get_all_users():
 def register_user(email, password, days, hours, minutes):
     if not is_valid_email(email):
         return False, "البريد الإلكتروني غير صحيح"
+    # 1) إنشاء في Authentication أولاً (يظهر في https://console.firebase.google.com/project/ahmed-hartak/authentication/users)
+    ok_auth, msg_auth = create_firebase_auth_user(email.strip().lower(), password)
+    if not ok_auth:
+        return False, msg_auth
+    # 2) إنشاء في Realtime Database مع تاريخ الانتهاء
     total_seconds = days * 86400 + hours * 3600 + minutes * 60
     now = get_google_timestamp()
-    data = {"email": email.strip().lower(), "password": hash_password(password), "created": now, "expires": now + total_seconds}
+    data = {"email": email.strip().lower(), "password": hash_password(password), "created": now, "expires": now + total_seconds, "authUid": msg_auth}
     key = encode_email(email)
     url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(key, safe=',')}.json"
     body = json.dumps(data).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="PUT")
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "تم إنشاء الحساب بنجاح!"
+        return True, "تم إنشاء الحساب في Authentication و Database بنجاح!"
     except urllib.error.HTTPError as e:
-        return False, f"Server error ({e.code}). Check the write rules."
+        return False, f"تم إنشاؤه في Auth لكن فشل Database ({e.code}). احذفه من Authentication يدوياً"
     except Exception:
-        return False, "Could not connect to the database."
+        return False, "تم إنشاؤه في Auth لكن تعذر الاتصال بـ Database"
 
 
 def renew_user(email, days, hours, minutes):
@@ -143,7 +178,6 @@ def change_password(email, new_password):
 
 def delete_user(email):
     key = encode_email(email)
-    # جرب المفتاحين
     users = get_all_users()
     actual_key = key
     if users is not None and key not in users and email.strip() in users:
@@ -152,7 +186,7 @@ def delete_user(email):
     req = urllib.request.Request(url, method="DELETE")
     try:
         urllib.request.urlopen(req, timeout=15)
-        return True, "تم حذف المستخدم بنجاح!"
+        return True, "تم حذفه من Database. احذفه يدوياً من Authentication: console.firebase.google.com/project/ahmed-hartak/authentication/users"
     except urllib.error.HTTPError as e:
         return False, f"Server error ({e.code}). Check the write rules."
     except Exception:
