@@ -1,0 +1,40 @@
+name: Build Admin APK
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'admin_mobile/**'
+      - '.github/workflows/build-admin.yml'
+  workflow_dispatch:
+
+jobs:
+  build-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3'
+          channel: 'stable'
+          cache: true
+      - name: Generate Admin Android project
+        working-directory: admin_mobile
+        run: |
+          flutter create . --project-name kartak_admin --org com.kartak --platforms android
+          cat android/app/build.gradle | grep -E "applicationId|namespace" || true
+      - name: Install deps
+        working-directory: admin_mobile
+        run: flutter pub get
+      - name: Build Admin APK
+        working-directory: admin_mobile
+        run: flutter build apk --release --split-per-abi
+      - name: Build Admin universal
+        working-directory: admin_mobile
+        run: flutter build apk --release
+      - name: Upload Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kartak-admin-apk
+          path: admin_mobile/build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
