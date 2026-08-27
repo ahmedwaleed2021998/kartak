@@ -118,6 +118,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text('wa.me/+201098969844', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    const SizedBox(height: 10),
+                    const Text('المطور AHMED_ELDEEP', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   ],
                 ),
               ),
