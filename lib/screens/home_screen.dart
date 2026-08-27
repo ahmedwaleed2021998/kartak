@@ -329,45 +329,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(children: [
-                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("سجل العمليات", style: TextStyle(fontWeight: FontWeight.bold)), TextButton(onPressed: () => setState(() => logs.clear()), child: const Text("مسح"))]),
-                          Container(height: 120, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: logs.isEmpty ? const Center(child: Text("لا يوجد سجل", style: TextStyle(color: Colors.white54))) : ListView.builder(itemCount: logs.length, itemBuilder: (_, i) => Text(logs[i], style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 11), textDirection: TextDirection.rtl))),
-                        ]),
-                      ),
-                    ),
-                    Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text("سجلك المحفوظ (Firebase)", style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          StreamBuilder<QuerySnapshot>(
-                            stream: firestore.ordersStream(),
-                            builder: (context, snap) {
-                              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                              if (snap.data!.docs.isEmpty) return const Text("لا توجد عمليات محفوظة", style: TextStyle(color: Colors.grey));
-                              return ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: snap.data!.docs.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (_, i) {
-                                  final d = snap.data!.docs[i].data() as Map<String, dynamic>;
-                                  final isOk = d['status'] == 'success';
-                                  return ListTile(dense: true, leading: Icon(isOk ? Icons.check_circle : Icons.error, color: isOk ? Colors.green : Colors.red, size: 20), title: Text(d['productName'] ?? '', style: const TextStyle(fontSize: 13)), subtitle: Text("${d['receiver']} • ${d['status']}", style: const TextStyle(fontSize: 11)), trailing: Text(d['createdAtLocal']?.toString().substring(11, 16) ?? '', style: const TextStyle(fontSize: 11)));
-                                },
-                              );
-                            },
-                          ),
-                        ]),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     const SizedBox(height: 4),
                     const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),

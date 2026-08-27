@@ -115,7 +115,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: _loading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : Text(_isLogin ? 'دخول' : 'إنشاء حساب', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
-                    TextButton(onPressed: ()=>setState(()=>_isLogin=!_isLogin), child: Text(_isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب؟ ادخل')),
+                    TextButton(
+                      onPressed: _contactDeveloper,
+                      child: const Text('ليس لديك حساب؟ تواصل معنا على واتساب', style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold)),
+                    ),
                     const Divider(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -127,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text('wa.me/+201098969844', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    const Text('wa.me/201098969844', style: TextStyle(color: Colors.grey, fontSize: 11)),
                     const SizedBox(height: 10),
                     const Text('المطور AHMED_ELDEEP', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   ],
