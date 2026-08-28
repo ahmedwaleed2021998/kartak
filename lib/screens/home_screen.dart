@@ -400,8 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Column(children: [
                       Icon(Icons.local_offer, color: Colors.white, size: 28),
                       SizedBox(height: 6),
-                      Text("خصم 50% فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                      Text("تثبيت JoKs", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
+                      Text("خصم 50% باقات فليكس فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
                     ]),
                   ),
                 ),

@@ -79,12 +79,12 @@ class VodafoneService {
     ("25", "🌐 مارد 10 سوشيال", "Mared_10_Social"),
   ];
 
-  /// 1. get_seamless - نفس دالة get_seamless() في البايثون:42 - حد أقصى 15 ثانية
+  /// 1. get_seamless - حد أقصى 10 ثواني
   Future<({String seamless, String msisdn})> getSeamless() async {
     final url = Uri.parse(
         'http://mobile.vodafone.com.eg/checkSeamless/realms/vf-realm/protocol/openid-connect/auth?client_id=cash-app');
     final headers = {..._headers, 'If-Modified-Since': 'Thu, 02 Apr 2026 09:09:07 GMT'};
-    final resp = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+    final resp = await http.get(url, headers: headers).timeout(const Duration(seconds: 10));
     if (resp.statusCode != 200) throw Exception('فشل الاتصال - كود ${resp.statusCode}. تأكد من داتا فودافون أو VPN');
     final data = jsonDecode(resp.body);
     final raw = data['msisdn'] as String?;
@@ -111,7 +111,7 @@ class VodafoneService {
       'client_secret': 'b86e30a8-ae29-467a-a71f-65c73f2ff5e3',
       'client_id': 'cash-app',
     };
-    final resp = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 15));
+    final resp = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
     if (resp.statusCode != 200) throw Exception('فشل التوكن - كود ${resp.statusCode}: ${resp.body.substring(0, 200)}');
     final data = jsonDecode(resp.body);
     final token = data['access_token'] as String?;
@@ -119,7 +119,7 @@ class VodafoneService {
     return token;
   }
 
-  /// 3. send_order - نفس دالة send_order() في البايثون:118
+  /// 3. send_order
   Future<Map<String, dynamic>> sendOrder({
     required String productId,
     required String receiver,
@@ -167,7 +167,7 @@ class VodafoneService {
       'Content-Type': 'application/json; charset=UTF-8',
     };
 
-    final resp = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 15));
+    final resp = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 10));
     final data = resp.body.isNotEmpty ? jsonDecode(resp.body) as Map<String, dynamic> : <String, dynamic>{};
     data['_httpStatus'] = resp.statusCode;
     return data;

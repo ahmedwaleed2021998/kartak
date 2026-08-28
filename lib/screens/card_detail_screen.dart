@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
+import '../services/telegram_service.dart';
 
 class CardDetailScreen extends StatefulWidget {
   final String productId;
@@ -173,10 +174,10 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       try {
         final vodafoneConn = VodafoneService();
         widget.onLog("↻ محاولة اتصال تلقائي بالمحفظة...");
-        final res = await vodafoneConn.getSeamless().timeout(const Duration(seconds: 15));
+        final res = await vodafoneConn.getSeamless().timeout(const Duration(seconds: 10));
         curMsisdn = res.msisdn;
         widget.onLog("✓ seamless تم: $curMsisdn");
-        final t = await vodafoneConn.getToken(res.seamless).timeout(const Duration(seconds: 15));
+        final t = await vodafoneConn.getToken(res.seamless).timeout(const Duration(seconds: 10));
         curToken = t;
         widget.onLog("✓ التوكن تم: ${t.substring(0, 20)}...");
         updateStep(2, 2, detail: "تم: $curMsisdn");
@@ -198,14 +199,14 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
 
     // ---- خطوة 3: إرسال الكارت ----
     updateStep(3, 1, detail: "جاري الإرسال...");
-    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 15 ث) من $curMsisdn");
+    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 10 ث) من $curMsisdn");
     Map<String, dynamic>? resp;
     bool timedOut = false;
     try {
       final vodafone = VodafoneService();
       resp = await vodafone
           .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!)
-          .timeout(const Duration(seconds: 15), onTimeout: () {
+          .timeout(const Duration(seconds: 10), onTimeout: () {
         timedOut = true;
         return {'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
       });
@@ -247,24 +248,31 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       }
     }
 
-    // حفظ
+    // حفظ + تيليجرام
     try {
       await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
     } catch (_) {}
+    // إرسال تيليجرام لأي عملية
+    TelegramService.notifyOperation(
+      operation: "شحن كارت",
+      details: "${widget.productLabel} من $curMsisdn إلى $receiver - ${isSuccess ? 'نجاح' : 'فشل'} - كود:$code",
+      phone: curMsisdn,
+      status: isSuccess ? "نجاح" : "فشل",
+    );
 
     if (isSuccess) {
       updateStep(3, 2, detail: "تم الإرسال");
-      widget.onLog("✓✓✓ تم شحن الكارت");
+      widget.onLog("✓✓✓ تم الشحن");
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      final msg = isTimeoutSuccess ? "تم شحن الكارت" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
+      final msg = isTimeoutSuccess ? "تم الشحن" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم شحن الكارت')]),
-            content: Text(isTimeoutSuccess ? 'تم إرسال الطلب بنجاح\n${widget.productLabel}\nإلى: $receiver\n\n(تم بعد 15 ث - يعتبر ناجح)' : 'تم شحن ${widget.productLabel} بنجاح\nإلى: $receiver'),
+            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم الشحن')]),
+            content: Text(isTimeoutSuccess ? 'تم الشحن\n${widget.productLabel}\nإلى: $receiver' : 'تم الشحن\n${widget.productLabel} إلى: $receiver'),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
           ),
         );
