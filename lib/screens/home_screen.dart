@@ -11,6 +11,7 @@ import '../services/device_service.dart';
 import '../services/security_service.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_provider.dart';
+import '../services/version_service.dart';
 import 'card_detail_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
@@ -46,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkSubscription();
     _loadFavs();
     searchCtrl.addListener(() => setState(() => searchQuery = searchCtrl.text.trim()));
+    _checkForceUpdate();
   }
 
   Future<void> _loadFavs() async {
@@ -142,6 +144,47 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     if (mounted) setState(() => checkingSub = false);
+  }
+
+  Future<void> _checkForceUpdate() async {
+    try {
+      final remote = await VersionService.fetchRemote();
+      if (remote == null) return;
+      final latest = remote['latest']?.toString() ?? "";
+      final force = remote['force'] == true;
+      final url = remote['url']?.toString() ?? "https://github.com/ahmedwaleed2021998/kartak/releases";
+      if (latest.isEmpty || !force) return;
+      final current = await VersionService.getCurrentVersion();
+      if (VersionService.compareBuild(current, latest) <= 0) return;
+      if (mounted) _showForceUpdateDialog(latest, url);
+    } catch (_) {}
+  }
+
+  void _showForceUpdateDialog(String latest, String url) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Row(children: [Icon(Icons.system_update, color: Colors.red), SizedBox(width: 8), Text("تحديث إجباري")]),
+          content: Text("يجب تحديث التطبيق إلى الإصدار $latest للمتابعة\nلن يعمل البرنامج بدون التحديث"),
+          actions: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white),
+              onPressed: () async {
+                final uri = Uri.parse(url);
+                try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
+                try { if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return; } catch (_) {}
+                await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
+              },
+              icon: const Icon(Icons.download),
+              label: const Text("تحديث الآن"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showDeviceBlockedDialog(String msg) {
@@ -442,141 +485,112 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0F172A),
-          foregroundColor: Colors.white,
-          title: Row(children: [
-            Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
-            const SizedBox(width: 10),
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
-            ]),
+        foregroundColor: Colors.white,
+        title: Row(children: [
+          Image.asset('assets/images/logo.png', width: 36, height: 36, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white)),
+          const SizedBox(width: 10),
+          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text("كروت وشحن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
           ]),
-          actions: [
-            Consumer<ThemeProvider>(builder: (_, th, __) => IconButton(tooltip: th.isDark ? "وضع نهاري" : "وضع ليلي", onPressed: () => th.toggle(), icon: Icon(th.isDark ? Icons.light_mode : Icons.dark_mode))),
-            IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
-          ],
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            indicatorColor: Color(0xFFE11D48),
-            indicatorWeight: 3,
-            tabs: [
-              Tab(icon: Icon(Icons.credit_card), text: "فكة"),
-              Tab(icon: Icon(Icons.phone_in_talk), text: "مارد"),
-            ],
-          ),
-        ),
-        body: Column(children: [
-          Padding(padding: const EdgeInsets.all(12), child: connectionCard),
+        ]),
+        actions: [
+          Consumer<ThemeProvider>(builder: (_, th, __) => IconButton(tooltip: th.isDark ? "وضع نهاري" : "وضع ليلي", onPressed: () => th.toggle(), icon: Icon(th.isDark ? Icons.light_mode : Icons.dark_mode))),
+          IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          connectionCard,
+          if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
           if (_subRemaining.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFACC15), width: 1)),
-                child: Row(children: [
-                  const Icon(Icons.timer_outlined, color: Color(0xFFFACC15), size: 16),
-                  const SizedBox(width: 6),
-                  Text("الاشتراك: $_subRemaining", style: const TextStyle(color: Color(0xFFFACC15), fontSize: 12, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  if (_expiresDate != null) Text("ينتهي: ${_expiresDate!.day}/${_expiresDate!.month}/${_expiresDate!.year}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                ]),
-              ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFACC15), width: 1)),
+              child: Row(children: [
+                const Icon(Icons.timer_outlined, color: Color(0xFFFACC15), size: 16),
+                const SizedBox(width: 6),
+                Text("الاشتراك: $_subRemaining", style: const TextStyle(color: Color(0xFFFACC15), fontSize: 12, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (_expiresDate != null) Text("ينتهي: ${_expiresDate!.day}/${_expiresDate!.month}/${_expiresDate!.year}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
+              ]),
             ),
-          if (_subRemaining.isNotEmpty) const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JoksScreen())),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Column(children: [
-                      Icon(Icons.local_offer, color: Colors.white, size: 28),
-                      SizedBox(height: 6),
-                      Text("خصم 50% باقات فليكس فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
-                    ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JoksScreen())),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: const Column(children: [
+                    Icon(Icons.local_offer, color: Colors.white, size: 28),
+                    SizedBox(height: 6),
+                    Text("خصم 50% باقات فليكس فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
+                  ]),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlexExtraScreen())),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.fromBorderSide(BorderSide(color: Color(0xFFFACC15), width: 1.5)),
-                    ),
-                    child: const Column(children: [
-                      Icon(Icons.calendar_today, color: Color(0xFFFACC15), size: 28),
-                      SizedBox(height: 6),
-                      Text("تزويد يومين", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                      Text("لباقة فليكس", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
-                    ]),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlexExtraScreen())),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.fromBorderSide(BorderSide(color: Color(0xFFFACC15), width: 1.5)),
                   ),
+                  child: const Column(children: [
+                    Icon(Icons.calendar_today, color: Color(0xFFFACC15), size: 28),
+                    SizedBox(height: 6),
+                    Text("تزويد يومين", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                    Text("لباقة فليكس", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
+                  ]),
                 ),
               ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: TextField(
-              controller: searchCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: InputDecoration(
-                hintText: "بحث سريع - فكة 10 أو مارد...",
-                hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
-                prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 20),
-                suffixIcon: searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear, color: Colors.white70, size: 18), onPressed: () => searchCtrl.clear()) : (favIds.isNotEmpty ? const Icon(Icons.star, color: Colors.amber, size: 18) : null),
-                filled: true,
-                fillColor: const Color(0xFF1E293B),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          TextField(
+            controller: searchCtrl,
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: "بحث سريع - فكة 10 أو مارد...",
+              hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 20),
+              suffixIcon: searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear, color: Colors.white70, size: 18), onPressed: () => searchCtrl.clear()) : (favIds.isNotEmpty ? const Icon(Icons.star, color: Colors.amber, size: 18) : null),
+              filled: true,
+              fillColor: const Color(0xFF1E293B),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
           ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: TabBarView(children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: Column(children: [
-                  buildGrid(fakkaProducts),
-                  const SizedBox(height: 12),
-                  const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const SizedBox(height: 4),
-                  const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                ]),
-              ),
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: Column(children: [
-                  buildGrid(maredProducts),
-                  const SizedBox(height: 12),
-                  const Text("المارد - باقات مكالمات وفليكسات", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                  const SizedBox(height: 8),
-                  const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                ]),
-              ),
-            ]),
-          ),
+          const SizedBox(height: 12),
+          // فكة - القائمة كلها تنزل مع بعض
+          Row(children: const [Icon(Icons.credit_card, color: Color(0xFFE11D48), size: 18), SizedBox(width: 6), Text("كروت فكة", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))]),
+          const SizedBox(height: 8),
+          buildGrid(fakkaProducts),
+          const SizedBox(height: 16),
+          Row(children: const [Icon(Icons.phone_in_talk, color: Color(0xFFFACC15), size: 18), SizedBox(width: 6), Text("باقات مارد", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))]),
+          const SizedBox(height: 8),
+          buildGrid(maredProducts),
+          const SizedBox(height: 16),
+          const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          const SizedBox(height: 4),
+          const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),
         ]),
       ),
     );
