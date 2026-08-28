@@ -88,9 +88,7 @@ jobs:
           python3 /tmp/gen_icons.py
           ls android/app/src/main/res/mipmap-*/launcher_icon.png 2>/dev/null | head -10 || true
           cat android/app/src/main/AndroidManifest.xml | grep icon || true
-      - name: Build APK (release) - مشفر ومحمي
-        run: flutter build apk --release --obfuscate --split-debug-info=./symbols --split-per-abi
-      - name: Build APK universal - مشفر
+      - name: Build APK (release) - مشفر - app-release فقط
         run: flutter build apk --release --obfuscate --split-debug-info=./symbols
       - name: Upload APK
         uses: actions/upload-artifact@v4
