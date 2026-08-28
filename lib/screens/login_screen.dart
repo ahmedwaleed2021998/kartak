@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _contactDeveloper() async {
     // رابط مباشر يفتح في كروم حتى لو واتساب مش متثبت
-    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20');
+    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201208739523&text=مرحبا%20مطور%20كروت%20وشحن%20');
     try {
       // حاول فتح في المتصفح الخارجي (كروم)
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -130,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text('wa.me/201098969844', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    const Text('wa.me/201208739523', style: TextStyle(color: Colors.grey, fontSize: 11)),
                     const SizedBox(height: 10),
                     const Text('المطور AHMED_ELDEEP', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   ],

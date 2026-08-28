@@ -8,6 +8,8 @@ import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
 import '../services/device_service.dart';
 import 'card_detail_screen.dart';
+import 'joks_screen.dart';
+import 'flex_extra_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -98,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
               onPressed: () async {
-                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20إيميلي%20مربوط%20بجهاز%20آخر%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201208739523&text=مرحبا%20مطور%20كروت%20وشحن%20إيميلي%20مربوط%20بجهاز%20آخر%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
                 try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
                 await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
               },
@@ -125,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
               onPressed: () async {
-                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+                final uri = Uri.parse('https://api.whatsapp.com/send?phone=201208739523&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
                 try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
                 try { if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return; } catch (_) {}
                 await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
@@ -140,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _contactExpired() async {
-    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201098969844&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
+    final uri = Uri.parse('https://api.whatsapp.com/send?phone=201208739523&text=مرحبا%20مطور%20كروت%20وشحن%20اشتراكي%20انتهى%20-%20${FirebaseAuth.instance.currentUser?.email ?? ''}');
     try { if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return; } catch (_) {}
     try { if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return; } catch (_) {}
     await launchUrl(uri, mode: LaunchMode.inAppWebView, webViewConfiguration: const WebViewConfiguration(enableJavaScript: true, enableDomStorage: true));
@@ -382,6 +384,52 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         body: Column(children: [
           Padding(padding: const EdgeInsets.all(12), child: connectionCard),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JoksScreen())),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Column(children: [
+                      Icon(Icons.local_offer, color: Colors.white, size: 28),
+                      SizedBox(height: 6),
+                      Text("خصم 50% فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                      Text("تثبيت JoKs", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlexExtraScreen())),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.fromBorderSide(BorderSide(color: Color(0xFFFACC15), width: 1.5)),
+                    ),
+                    child: const Column(children: [
+                      Icon(Icons.calendar_today, color: Color(0xFFFACC15), size: 28),
+                      SizedBox(height: 6),
+                      Text("تزويد يومين", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                      Text("لباقة فليكس", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
+                    ]),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 6),
           Expanded(
             child: TabBarView(children: [
               SingleChildScrollView(
