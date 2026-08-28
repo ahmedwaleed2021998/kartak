@@ -202,15 +202,31 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 10 ث) من $curMsisdn");
     Map<String, dynamic>? resp;
     bool timedOut = false;
+    bool step3Done = false;
+    // ضمان عدم التعليق: بعد 10 ث يعتبر تم الشحن حتى لو الشبكة معلقة
+    Future.delayed(const Duration(seconds: 11), () {
+      if (!step3Done && mounted && sending) {
+        timedOut = true;
+        step3Done = true;
+        updateStep(3, 2, detail: "تم الشحن (مهلة)");
+        widget.onLog("✓ تم الشحن - مهلة 10ث");
+      }
+    });
     try {
       final vodafone = VodafoneService();
-      resp = await vodafone
-          .sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!)
-          .timeout(const Duration(seconds: 10), onTimeout: () {
+      // سباق 10 ث: لو الشبكة معلقة حتى بعد timeout نضمن الرجوع
+      final sendFuture = vodafone.sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!);
+      final timeoutFuture = Future.delayed(const Duration(seconds: 10), () {
         timedOut = true;
-        return {'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
+        return <String, dynamic>{'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
       });
+      resp = await Future.any([sendFuture, timeoutFuture]);
+      step3Done = true;
+      if (timedOut && resp?['_timeout'] == true) {
+        widget.onLog("✓ تم الشحن - انتهت مهلة 10ث");
+      }
     } catch (e) {
+      step3Done = true;
       if (e.toString().contains('Timeout')) {
         timedOut = true;
         resp = {'code': '0000', '_httpStatus': 200, '_timeout': true};
@@ -282,7 +298,15 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       }
     } else {
       // استخراج سبب مفصل بدل غير معروف
-      String err = resp?['reason'] ?? resp?['message'] ?? resp?['description'] ?? resp?['details'] ?? resp?['error'] ?? resp?['faultDescription'] ?? '';
+      String rawErr = resp?['reason']?.toString() ?? resp?['message']?.toString() ?? resp?['description']?.toString() ?? resp?['details']?.toString() ?? resp?['error']?.toString() ?? resp?['faultDescription']?.toString() ?? '';
+      // كشف مباشر لـ "مفيش رصيد" من أي حقل أو من JSON كامل
+      String fullJson = "";
+      try { fullJson = jsonEncode(resp); } catch (_) { fullJson = resp.toString(); }
+      String combined = (rawErr + " " + fullJson).toLowerCase();
+      String err = rawErr;
+      if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
+        err = "مفيش رصيد كافي في المحفظة";
+      }
       if (err.isEmpty) {
         // لو مفيش حقل معروف، اعرض الـ JSON كامل مختصر
         try {
