@@ -39,6 +39,7 @@ class JoksService {
         if (token != null && token.isNotEmpty) return (success: true, token: token, message: 'تم تسجيل الدخول بنجاح');
         return (success: false, token: null, message: 'لم يتم العثور على التوكن');
       }
+      if (resp.statusCode == 401) return (success: false, token: null, message: 'الباسورد او الرقم خطأ');
       return (success: false, token: null, message: 'فشل تسجيل الدخول (كود ${resp.statusCode})');
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('Connection')) {
@@ -77,7 +78,7 @@ class JoksService {
     };
     try {
       final uri = url.replace(queryParameters: params);
-      final resp = await http.get(uri, headers: headers).timeout(const Duration(seconds: 12));
+      final resp = await http.get(uri, headers: headers).timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data is List) return data;
@@ -290,9 +291,10 @@ class JoksService {
       'Accept-Language': 'ar',
     };
     try {
-      final resp = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 12));
+      final resp = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 10));
       Map<String, dynamic> data = {};
       try { data = jsonDecode(resp.body) as Map<String, dynamic>; } catch (_) {}
+      if (resp.statusCode == 401) return (success: false, message: 'الباسورد او الرقم خطأ');
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         if (data['code'] == '1008') return (success: true, message: 'تم الاشتراك في خصم ${offer['discount_amount']} جنيه على ${offer['bundle_name']}');
         if (data['state'] == 'completed') return (success: true, message: 'تم تفعيل خصم ${offer['discount_amount']} جنيه على ${offer['bundle_name']}');

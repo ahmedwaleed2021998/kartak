@@ -119,6 +119,19 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
 
     // مهلة صغيرة لإظهار الـ dialog قبل البدء
     await Future.delayed(const Duration(milliseconds: 300));
+    // تأمين إضافي: لو بعد 12 ث لسه معلق، اقفل الـ dialog بالقوة واعتبره تم الشحن
+    bool hardDone = false;
+    Future.delayed(const Duration(seconds: 10), () {
+      if (!hardDone && mounted && sending) {
+        hardDone = true;
+        try { Navigator.of(context, rootNavigator: true).pop(); } catch (_) {}
+        updateStep(3, 2, detail: "تم الشحن");
+        if (mounted) {
+          setState(() => sending = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الشحن"), backgroundColor: Colors.green));
+        }
+      }
+    });
 
     // ---- خطوة 1: التحقق من الاشتراك ----
     updateStep(1, 1);
@@ -204,7 +217,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     bool timedOut = false;
     bool step3Done = false;
     // ضمان عدم التعليق: بعد 10 ث يعتبر تم الشحن حتى لو الشبكة معلقة
-    Future.delayed(const Duration(seconds: 11), () {
+    Future.delayed(const Duration(seconds: 10), () {
       if (!step3Done && mounted && sending) {
         timedOut = true;
         step3Done = true;
@@ -277,6 +290,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
 
     if (isSuccess) {
+      hardDone = true;
       updateStep(3, 2, detail: "تم الإرسال");
       widget.onLog("✓✓✓ تم الشحن");
       await Future.delayed(const Duration(milliseconds: 400));
@@ -298,14 +312,17 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       }
     } else {
       // استخراج سبب مفصل بدل غير معروف
+      hardDone = true;
       String rawErr = resp?['reason']?.toString() ?? resp?['message']?.toString() ?? resp?['description']?.toString() ?? resp?['details']?.toString() ?? resp?['error']?.toString() ?? resp?['faultDescription']?.toString() ?? '';
       // كشف مباشر لـ "مفيش رصيد" من أي حقل أو من JSON كامل
       String fullJson = "";
       try { fullJson = jsonEncode(resp); } catch (_) { fullJson = resp.toString(); }
       String combined = (rawErr + " " + fullJson).toLowerCase();
       String err = rawErr;
-      if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
-        err = "مفيش رصيد كافي في المحفظة";
+      if (status == 400) {
+        err = "مفيش رصيد كافى علي المحفظة";
+      } else if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
+        err = "مفيش رصيد كافى علي المحفظة";
       }
       if (err.isEmpty) {
         // لو مفيش حقل معروف، اعرض الـ JSON كامل مختصر

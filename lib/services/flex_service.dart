@@ -61,7 +61,7 @@ class FlexService {
     };
     try {
       final uri = url.replace(queryParameters: params);
-      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 12));
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 10));
       if (r.statusCode != 200) return null;
       final products = jsonDecode(r.body);
       final list = products is List ? products : [products];
@@ -118,7 +118,7 @@ class FlexService {
       '@type': 'Flex',
     };
     try {
-      final r = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 12));
+      final r = await http.post(url, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 10));
       if (r.statusCode == 200) return (success: true, message: 'تم تفعيل خدمة تزويد اليومين بنجاح!', body: r.body);
       try {
         final data = jsonDecode(r.body);
