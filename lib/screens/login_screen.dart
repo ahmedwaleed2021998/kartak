@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/firestore_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +18,67 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLogin = true;
   bool _loading = false;
   bool _obscure = true;
+  bool _remember = true;
+  final _storage = const FlutterSecureStorage();
+  final _auth = LocalAuthentication();
+  bool _bioAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBio();
+    _loadSaved();
+  }
+
+  Future<void> _checkBio() async {
+    try {
+      final can = await _auth.canCheckBiometrics;
+      final isDeviceSupported = await _auth.isDeviceSupported();
+      setState(() => _bioAvailable = can && isDeviceSupported);
+    } catch (_) {}
+  }
+
+  Future<void> _loadSaved() async {
+    final e = await _storage.read(key: 'saved_email');
+    final p = await _storage.read(key: 'saved_pass');
+    if (e != null && p != null) {
+      setState(() {
+        _email.text = e;
+        _pass.text = p;
+      });
+    }
+  }
+
+  Future<void> _saveCreds() async {
+    if (_remember) {
+      await _storage.write(key: 'saved_email', value: _email.text.trim());
+      await _storage.write(key: 'saved_pass', value: _pass.text.trim());
+    } else {
+      await _storage.delete(key: 'saved_email');
+      await _storage.delete(key: 'saved_pass');
+    }
+  }
+
+  Future<void> _bioLogin() async {
+    try {
+      final ok = await _auth.authenticate(localizedReason: 'سجل دخول ببصمتك', options: const AuthenticationOptions(biometricOnly: false));
+      if (!ok) return;
+      final e = await _storage.read(key: 'saved_email');
+      final p = await _storage.read(key: 'saved_pass');
+      if (e == null || p == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد بيانات محفوظة - سجل دخول أولاً')));
+        return;
+      }
+      setState(() => _loading = true);
+      await FirebaseAuth.instance.signInWithEmailAndPassword(email: e, password: p);
+    } on FirebaseAuthException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mapError(e.code)), backgroundColor: Colors.red));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('البصمة غير متاحة: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -27,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _email.text.trim(), password: _pass.text.trim());
         await FirestoreService().ensureUserDoc(displayName: cred.user?.email?.split('@').first);
       }
+      await _saveCreds();
     } on FirebaseAuthException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mapError(e.code)), backgroundColor: Colors.red));
     } finally {
@@ -35,10 +99,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _contactDeveloper() async {
-    // رابط مباشر يفتح في كروم حتى لو واتساب مش متثبت
     final uri = Uri.parse('https://api.whatsapp.com/send?phone=201208739523&text=مرحبا%20مطور%20كروت%20وشحن%20');
     try {
-      // حاول فتح في المتصفح الخارجي (كروم)
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (ok) return;
     } catch (_) {}
@@ -105,7 +167,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (v) => v!=null && v.length>=6 ? null : '6 أحرف على الأقل',
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Checkbox(value: _remember, onChanged: (v)=>setState(()=>_remember=v??true), activeColor: const Color(0xFFE11D48)),
+                      const Text('تذكر كلمة السر مشفرة', style: TextStyle(fontSize: 12)),
+                      const Spacer(),
+                      if (_bioAvailable) IconButton(onPressed: _bioLogin, icon: const Icon(Icons.fingerprint, color: Color(0xFFE11D48), size: 32), tooltip: 'دخول ببصمة'),
+                    ]),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -115,6 +184,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: _loading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : Text(_isLogin ? 'دخول' : 'إنشاء حساب', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    if (_bioAvailable) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: _loading ? null : _bioLogin,
+                          icon: const Icon(Icons.fingerprint, color: Color(0xFFE11D48)),
+                          label: const Text('دخول ببصمة', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFE11D48)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        ),
+                      ),
+                    ],
                     TextButton(
                       onPressed: _contactDeveloper,
                       child: const Text('ليس لديك حساب؟ تواصل معنا على واتساب', style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold)),

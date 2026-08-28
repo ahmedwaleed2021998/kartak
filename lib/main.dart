@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'services/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // تفعيل App Check - يحمي الـ backend من الطلبات غير الشرعية
   try {
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
@@ -20,22 +21,20 @@ void main() async {
       await FirebaseAppCheck.instance.activate(androidProvider: AndroidProvider.debug, appleProvider: AppleProvider.debug);
     } catch (_) {}
   }
-  runApp(const KartekApp());
+  runApp(ChangeNotifierProvider(create: (_) => ThemeProvider(), child: const KartekApp()));
 }
 
 class KartekApp extends StatelessWidget {
   const KartekApp({super.key});
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return MaterialApp(
       title: 'كروت وشحن',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE11D48)),
-        fontFamily: 'Cairo',
-        scaffoldBackgroundColor: const Color(0xFFF1F5F9),
-      ),
+      theme: theme.lightTheme,
+      darkTheme: theme.darkTheme,
+      themeMode: theme.mode,
       home: const AuthGate(),
     );
   }

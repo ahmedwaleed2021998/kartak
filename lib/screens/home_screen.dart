@@ -6,8 +6,11 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
+import 'package:provider/provider.dart';
 import '../services/device_service.dart';
 import '../services/security_service.dart';
+import '../services/favorites_service.dart';
+import '../services/theme_provider.dart';
 import 'card_detail_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
@@ -31,6 +34,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _expiresAt;
   String _subRemaining = "";
   DateTime? _expiresDate;
+  final searchCtrl = TextEditingController();
+  String searchQuery = "";
+  Set<String> favIds = {};
 
   List<String> logs = [];
 
@@ -38,6 +44,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _checkSubscription();
+    _loadFavs();
+    searchCtrl.addListener(() => setState(() => searchQuery = searchCtrl.text.trim()));
+  }
+
+  Future<void> _loadFavs() async {
+    favIds = await FavoritesService.getFavorites();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleFav(String pid) async {
+    await FavoritesService.toggle(pid);
+    favIds = await FavoritesService.getFavorites();
+    if (mounted) setState(() {});
   }
 
   void addLog(String m) => setState(() => logs.insert(0, "[${TimeOfDay.now().format(context)}] $m"));
@@ -251,6 +270,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final maredProducts = VodafoneService.products.where((p) => p.$2.contains("مارد")).toList();
 
     Widget buildGrid(List<(String, String, String)> items) {
+      // فلترة بحث ومفضلة
+      List<(String, String, String)> filtered = items;
+      if (searchQuery.isNotEmpty) {
+        final q = searchQuery.toLowerCase();
+        filtered = items.where((p) => p.$2.toLowerCase().contains(q) || p.$3.toLowerCase().contains(q) || p.$1.contains(q)).toList();
+        if (filtered.isEmpty) {
+          return const Padding(padding: EdgeInsets.all(24), child: Center(child: Text("لا توجد نتائج", style: TextStyle(color: Colors.white70))));
+        }
+      } else if (favIds.isNotEmpty) {
+        filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
+      }
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -260,9 +290,9 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
-        itemCount: items.length,
+        itemCount: filtered.length,
         itemBuilder: (context, idx) {
-          final p = items[idx];
+          final p = filtered[idx];
           final pid = p.$3;
           final name = p.$2;
           final number = p.$1;
@@ -293,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         Container(color: Colors.black.withOpacity(0.12)),
                         Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
+                        Positioned(top: 6, left: 6, child: InkWell(onTap: () => _toggleFav(pid), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle), child: Icon(favIds.contains(pid) ? Icons.star : Icons.star_border, color: favIds.contains(pid) ? Colors.amber : Colors.white70, size: 14)))),
                         Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
                       ],
                     ),
@@ -426,7 +457,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Text("شحن الفكة بأسعار زمان", style: TextStyle(fontSize: 11, color: Colors.white70)),
             ]),
           ]),
-          actions: [IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
+          actions: [
+            Consumer<ThemeProvider>(builder: (_, th, __) => IconButton(tooltip: th.isDark ? "وضع نهاري" : "وضع ليلي", onPressed: () => th.toggle(), icon: Icon(th.isDark ? Icons.light_mode : Icons.dark_mode))),
+            IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
+          ],
           bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
@@ -500,6 +534,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: TextField(
+              controller: searchCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: "بحث سريع - فكة 10 أو مارد...",
+                hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+                prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 20),
+                suffixIcon: searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear, color: Colors.white70, size: 18), onPressed: () => searchCtrl.clear()) : (favIds.isNotEmpty ? const Icon(Icons.star, color: Colors.amber, size: 18) : null),
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           Expanded(
