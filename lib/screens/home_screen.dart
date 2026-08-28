@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
 import '../services/device_service.dart';
+import '../services/security_service.dart';
 import 'card_detail_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
@@ -27,6 +28,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool connecting = false;
   bool checkingSub = true;
   bool expired = false;
+  int? _expiresAt;
+  String _subRemaining = "";
+  DateTime? _expiresDate;
 
   List<String> logs = [];
 
@@ -38,13 +42,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void addLog(String m) => setState(() => logs.insert(0, "[${TimeOfDay.now().format(context)}] $m"));
 
+  String _formatRemaining(int seconds) {
+    if (seconds <= 0) return "منتهي";
+    final d = seconds ~/ 86400;
+    final h = (seconds % 86400) ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    if (d > 0) return "متبقي $d يوم${d > 1 ? '' : ''}${h > 0 ? " و $h ساعة" : ""}";
+    if (h > 0) return "متبقي $h ساعة و $m دقيقة";
+    if (m > 0) return "متبقي $m دقيقة";
+    return "متبقي أقل من دقيقة";
+  }
+
   Future<void> _checkSubscription() async {
     final email = FirebaseAuth.instance.currentUser?.email;
     if (email == null) {
       setState(() => checkingSub = false);
       return;
     }
-    // تحقق انتهاء الاشتراك
+    // تحقق انتهاء الاشتراك + حساب الباقي
     try {
       final key = email.trim().toLowerCase().replaceAll('.', ',');
       final url = Uri.parse('https://ahmed-hartak-default-rtdb.firebaseio.com/users/${Uri.encodeComponent(key)}.json');
@@ -53,6 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final data = jsonDecode(resp.body);
         final expires = data is Map ? data['expires'] as int? : null;
         if (expires != null) {
+          _expiresAt = expires;
+          _expiresDate = DateTime.fromMillisecondsSinceEpoch(expires * 1000);
           int nowTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
           try {
             final g = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 5));
@@ -66,10 +83,32 @@ class _HomeScreenState extends State<HomeScreen> {
             });
             if (mounted) _showExpiredDialog();
             return;
+          } else {
+            final rem = expires - nowTs;
+            _subRemaining = _formatRemaining(rem);
           }
+        } else {
+          _subRemaining = "اشتراك مفتوح";
         }
+      } else {
+        _subRemaining = "اشتراك غير محدد";
       }
-    } catch (_) {}
+    } catch (_) {
+      _subRemaining = "";
+    }
+    // فحص الأمان - محاكي
+    if (await SecurityService.isEmulator()) {
+      setState(() {
+        expired = true;
+        checkingSub = false;
+        _subRemaining = "محاكي غير مدعوم";
+      });
+      if (mounted) _showSecurityBlockDialog("التطبيق لا يعمل على المحاكي - استخدم جهاز حقيقي");
+      return;
+    }
+    if (await SecurityService.isRooted()) {
+      addLog("تحذير: جهاز مكسور الحماية");
+    }
     // تحقق ربط الجهاز - إيميل = جهاز واحد فقط
     final emailForDevice = FirebaseAuth.instance.currentUser?.email;
     if (emailForDevice != null) {
@@ -107,6 +146,23 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.chat),
               label: const Text('تواصل لفك الربط'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSecurityBlockDialog(String msg) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Row(children: [Icon(Icons.security, color: Colors.red), SizedBox(width: 8), Text('جهاز غير مدعوم')]),
+          content: Text(msg, style: const TextStyle(fontSize: 14)),
+          actions: [
+            TextButton(onPressed: () async { await FirebaseAuth.instance.signOut(); if (context.mounted) Navigator.of(context).pop(); }, child: const Text('خروج')),
           ],
         ),
       ),
@@ -384,6 +440,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         body: Column(children: [
           Padding(padding: const EdgeInsets.all(12), child: connectionCard),
+          if (_subRemaining.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFACC15), width: 1)),
+                child: Row(children: [
+                  const Icon(Icons.timer_outlined, color: Color(0xFFFACC15), size: 16),
+                  const SizedBox(width: 6),
+                  Text("الاشتراك: $_subRemaining", style: const TextStyle(color: Color(0xFFFACC15), fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  if (_expiresDate != null) Text("ينتهي: ${_expiresDate!.day}/${_expiresDate!.month}/${_expiresDate!.year}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                ]),
+              ),
+            ),
+          if (_subRemaining.isNotEmpty) const SizedBox(height: 6),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
