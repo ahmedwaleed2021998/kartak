@@ -69,11 +69,17 @@ class _RechargeBalanceScreenState extends State<RechargeBalanceScreen> {
   @override
   Widget build(BuildContext context) {
     final connected = msisdn != null && token != null;
+    final w = MediaQuery.of(context).size.width;
+    final isTablet = w > 600;
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, title: const Text("شحن رصيد", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 700 : 600),
+            child: SingleChildScrollView(
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(
             height: 120,
@@ -121,6 +127,9 @@ class _RechargeBalanceScreenState extends State<RechargeBalanceScreen> {
           const SizedBox(height: 12),
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         ]),
+            ),
+          ),
+        ),
       ),
     );
   }

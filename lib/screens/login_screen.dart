@@ -144,12 +144,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isTablet = w > 600;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: Center(
+      body: SafeArea(
+        child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Card(
+          padding: EdgeInsets.all(isTablet ? 32 : 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 520 : 480),
+            child: Card(
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: Padding(
@@ -235,7 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          ),
         ),
+      ),
       ),
     );
   }

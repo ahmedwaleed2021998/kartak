@@ -327,15 +327,19 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
-      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت
+      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت مع نسب محسنة
       final width = MediaQuery.of(context).size.width;
       final isTablet = width > 600;
+      final isLargeTablet = width > 900;
+      final crossCount = isLargeTablet ? 4 : (isTablet ? 3 : 2);
+      final aspect = isLargeTablet ? 0.74 : (isTablet ? 0.76 : 0.78);
+      final imageH = isLargeTablet ? 135.0 : (isTablet ? 125.0 : 110.0);
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isTablet ? (width > 900 ? 4 : 3) : 2,
-          childAspectRatio: 0.78,
+          crossAxisCount: crossCount,
+          childAspectRatio: aspect,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -348,38 +352,47 @@ class _HomeScreenState extends State<HomeScreen> {
           final unitsText = VodafoneService.getUnits(pid);
           final isFakka = name.contains("فكة");
           final isMared = name.contains("مارد");
-          return InkWell(
-            onTap: () => openCard(pid, name, number),
+          return Material(
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
-            child: Card(
-              color: const Color(0xFF1E293B),
-              elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              clipBehavior: Clip.antiAlias,
-              child: Column(children: [
-                SizedBox(
-                  height: 110,
-                  width: double.infinity,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.asset(
-                          'assets/images/cards/$pid.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-                        ),
-                        Container(color: Colors.black.withOpacity(0.12)),
+            child: InkWell(
+              onTap: () => openCard(pid, name, number),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  SizedBox(
+                    height: imageH,
+                    width: double.infinity,
+                    child: Container(
+                      color: const Color(0xFF1E293B),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Container(color: const Color(0xFF1E293B)),
+                          Image.asset(
+                            'assets/images/cards/$pid.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B), child: Center(child: Image.asset('assets/images/logo.png', fit: BoxFit.contain, height: 70))),
+                          ),
+                          Container(color: Colors.black.withOpacity(0.10)),
                         Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
                         Positioned(top: 6, left: 6, child: InkWell(onTap: () => _toggleFav(pid), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle), child: Icon(favIds.contains(pid) ? Icons.star : Icons.star_border, color: favIds.contains(pid) ? Colors.amber : Colors.white70, size: 14)))),
                         Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
                       ],
+                      ),
                     ),
                   ),
                 ),
                 Expanded(
-                  child: Padding(
+                  child: Container(
+                    color: const Color(0xFF1E293B),
                     padding: const EdgeInsets.all(8),
                     child: Column(children: [
                       Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -396,6 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ]),
+              ),
             ),
           );
         },
@@ -510,12 +524,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: LayoutBuilder(builder: (context, constraints) {
-        final isTablet = MediaQuery.of(context).size.width > 600;
-        return Center(
+        final w = MediaQuery.of(context).size.width;
+        final isTablet = w > 600;
+        final isLarge = w > 900;
+        return SafeArea(
+          child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
+            constraints: BoxConstraints(maxWidth: isLarge ? 1100 : (isTablet ? 800 : 600)),
             child: SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isTablet ? 20 : 12),
             child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
@@ -647,11 +664,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 4),
           const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
 ]),
-           ),
-         ),
-       ),
-       }),
-      );
-    );
-  }
+            ),
+          ),
+        ),
+        ),
+        }),
+       );
+     );
+   }
 }

@@ -78,11 +78,17 @@ class _Offers365ScreenState extends State<Offers365Screen> {
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isTablet = w > 600;
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, title: const Text("عروض 365", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 750 : 600),
+            child: SingleChildScrollView(
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(
             height: 120,
@@ -172,6 +178,9 @@ class _Offers365ScreenState extends State<Offers365Screen> {
           const SizedBox(height: 12),
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         ]),
+            ),
+          ),
+        ),
       ),
     );
   }

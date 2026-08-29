@@ -96,6 +96,8 @@ class _JoksScreenState extends State<JoksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isTablet = w > 600;
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -103,8 +105,12 @@ class _JoksScreenState extends State<JoksScreen> {
         foregroundColor: Colors.white,
         title: const Text("خصم 50% باقات فليكس فودافون", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 750 : 600),
+            child: SingleChildScrollView(
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(
             height: 120,
@@ -189,6 +195,9 @@ class _JoksScreenState extends State<JoksScreen> {
           const SizedBox(height: 8),
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         ]),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -391,30 +391,38 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isTablet = w > 600;
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         title: Text(widget.productName, style: const TextStyle(fontSize: 14)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 700 : 600),
+            child: SingleChildScrollView(
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // صورة كبيرة - صورة الكارت المخصصة وإلا fallback
+          // صورة كبيرة - صورة الكارت المخصصة وإلا fallback - خلفية داكنة لمنع الأبيض
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              height: 180,
+              height: isTablet ? 260 : 180,
               width: double.infinity,
               color: const Color(0xFF1E293B),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  Container(color: const Color(0xFF1E293B)),
                   Image.asset(
                     'assets/images/cards/${widget.productId}.png',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB90A1A), Color(0xFF7A0A15)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                      color: const Color(0xFF1E293B),
                       child: Center(child: Image.asset('assets/images/logo.png', height: 90, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.sim_card, color: Colors.white, size: 50))),
                     ),
                   ),
@@ -489,6 +497,9 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           const SizedBox(height: 12),
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         ]),
+            ),
+          ),
+        ),
       ),
     );
   }
