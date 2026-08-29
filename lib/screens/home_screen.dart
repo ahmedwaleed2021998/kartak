@@ -15,6 +15,7 @@ import '../services/version_service.dart';
 import 'card_detail_screen.dart';
 import 'fourteen_screen.dart';
 import 'offers365_screen.dart';
+import 'recharge_balance_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
 
@@ -326,11 +327,14 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
+      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت
+      final width = MediaQuery.of(context).size.width;
+      final isTablet = width > 600;
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isTablet ? (width > 900 ? 4 : 3) : 2,
           childAspectRatio: 0.78,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
@@ -505,10 +509,12 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
+      body: LayoutBuilder(builder: (context, constraints) {
+        final isTablet = MediaQuery.of(context).size.width > 600;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
+            child: SingleChildScrollView(
             padding: const EdgeInsets.all(12),
             child: Column(children: [
           connectionCard,
@@ -644,6 +650,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      }),
     );
   }
 }
