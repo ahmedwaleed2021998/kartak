@@ -28,6 +28,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _checkBio();
     _loadSaved();
+    _tryAutoBio();
+  }
+
+  Future<void> _tryAutoBio() async {
+    await Future.delayed(const Duration(milliseconds: 1200));
+    try {
+      final can = await _auth.canCheckBiometrics;
+      final sup = await _auth.isDeviceSupported();
+      if (!can || !sup) return;
+    } catch (_) { return; }
+    final e = await _storage.read(key: 'saved_email');
+    final p = await _storage.read(key: 'saved_pass');
+    if (e != null && p != null && mounted && !_loading) {
+      _bioLogin();
+    }
   }
 
   Future<void> _checkBio() async {
