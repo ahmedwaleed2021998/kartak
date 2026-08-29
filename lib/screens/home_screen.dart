@@ -327,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
-      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت مع نسب محسنة
+      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت مع تحسين
       final width = MediaQuery.of(context).size.width;
       final isTablet = width > 600;
       final isLargeTablet = width > 900;
@@ -352,29 +352,23 @@ class _HomeScreenState extends State<HomeScreen> {
           final unitsText = VodafoneService.getUnits(pid);
           final isFakka = name.contains("فكة");
           final isMared = name.contains("مارد");
-          return Material(
-            color: Colors.transparent,
+          return InkWell(
+            onTap: () => openCard(pid, name, number),
             borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              onTap: () => openCard(pid, name, number),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2))],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(children: [
-                  SizedBox(
-                    height: imageH,
-                    width: double.infinity,
-                    child: Container(
-                      color: const Color(0xFF1E293B),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
+            child: Card(
+              color: const Color(0xFF1E293B),
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: [
+                SizedBox(
+                  height: imageH,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
                           Container(color: const Color(0xFF1E293B)),
                           Image.asset(
                             'assets/images/cards/$pid.png',
@@ -390,8 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Expanded(
-                  child: Container(
-                    color: const Color(0xFF1E293B),
+                  child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Column(children: [
                       Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -408,9 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ]),
-              ),
             ),
-          ),
           );
         },
       );
