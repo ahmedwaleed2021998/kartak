@@ -320,7 +320,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       String combined = (rawErr + " " + fullJson).toLowerCase();
       String err = rawErr;
       if (status == 400) {
-        err = "مفيش رصيد كافى علي المحفظة";
+        err = "الرقم السرى للمحفظة خطأ";
       } else if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
         err = "مفيش رصيد كافى علي المحفظة";
       }
