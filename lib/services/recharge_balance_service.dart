@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 
+class RechargeResult {
+  final bool success;
+  final dynamic data;
+  RechargeResult({required this.success, required this.data});
+}
+
 class RechargeBalanceService {
-  Future<({bool success, dynamic data})> recharge({
+  Future<RechargeResult> recharge({
     required String token,
     required String senderMsisdn,
     required String receiverNumber,
@@ -63,14 +69,14 @@ class RechargeBalanceService {
       dynamic data;
       try { data = jsonDecode(resp.body); } catch (_) { data = resp.body; }
       if (resp.statusCode == 200) {
-        if (data is Map && (data['state'] == 'Completed' || data['complete'] == true || data['code'] == '0000')) return (success: true, data: data);
+        if (data is Map && (data['state'] == 'Completed' || data['complete'] == true || data['code'] == '0000')) return RechargeResult(success: true, data: data);
         final reason = data is Map ? data['reason']?.toString() ?? 'رصيدك غير كافي أو خطأ' : resp.body;
-        if (reason.toLowerCase().contains('balance') || reason.contains('رصيد')) return (success: false, data: 'مفيش رصيد كافى علي المحفظة');
-        return (success: false, data: reason);
+        if (reason.toLowerCase().contains('balance') || reason.contains('رصيد')) return RechargeResult(success: false, data: 'مفيش رصيد كافى علي المحفظة');
+        return RechargeResult(success: false, data: reason);
       }
-      return (success: false, data: resp.body);
+      return RechargeResult(success: false, data: resp.body);
     } catch (e) {
-      return (success: false, data: e.toString());
+      return RechargeResult(success: false, data: e.toString());
     }
   }
 }
