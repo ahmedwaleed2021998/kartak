@@ -573,7 +573,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
             Expanded(
               child: InkWell(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FourteenScreen())),
@@ -590,6 +592,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(height: 6),
                     Text("تحويل 14 قرش", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
                     Text("نظام جديد", style: TextStyle(color: Colors.white70, fontSize: 9), textAlign: TextAlign.center),
+                  ]),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen())),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.fromBorderSide(BorderSide(color: Color(0xFFFACC15), width: 1)),
+                  ),
+                  child: const Column(children: [
+                    Icon(Icons.card_giftcard, color: Color(0xFFFACC15), size: 28),
+                    SizedBox(height: 6),
+                    Text("عروض 365", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                    Text("فودافون", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
                   ]),
                 ),
               ),
