@@ -42,16 +42,25 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   final firestore = FirestoreService();
 
   Future<void> send() async {
-    final receiver = toSelf ? widget.msisdn! : receiverCtrl.text.trim();
     final pin = pinCtrl.text.trim();
+    List<String> receivers;
+    if (toSelf) {
+      receivers = [widget.msisdn!];
+    } else if (receiverCount == 1) {
+      receivers = [receiverCtrl.text.trim()];
+    } else {
+      receivers = [receiverCtrl.text.trim(), receiver2Ctrl.text.trim()];
+    }
 
     if (widget.msisdn == null || widget.token == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("اتصل بالمحفظة أولاً من الصفحة الرئيسية")));
       return;
     }
-    if (!toSelf && !(receiver.startsWith("01") && receiver.length == 11)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("رقم المستلم خطأ")));
-      return;
+    for (final r in receivers) {
+      if (!(r.startsWith("01") && r.length == 11)) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("رقم المستلم خطأ: $r")));
+        return;
+      }
     }
     if (pin.length != 6 || int.tryParse(pin) == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("PIN لازم 6 أرقام")));
@@ -62,7 +71,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("تأكيد التحويل"),
-        content: Text("الكارت: ${widget.productLabel}\nالمرسل: ${widget.msisdn}\nالمستلم: $receiver\n\nسيتم الخصم فوراً"),
+        content: Text("الكارت: ${widget.productLabel}\nالمرسل: ${widget.msisdn}\nالمستلم: ${receivers.join(", ")}\n\nسيتم الخصم فوراً${receivers.length > 1 ? " (سيتم الإرسال لرقمين)" : ""}"),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")), ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("أوافق"))],
       ),
     );
