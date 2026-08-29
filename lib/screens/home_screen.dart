@@ -520,10 +520,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final isLarge = w > 900;
         return SafeArea(
           child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isLarge ? 1100 : (isTablet ? 800 : 600)),
-            child: SingleChildScrollView(
-            padding: EdgeInsets.all(isTablet ? 20 : 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isLarge ? 1100 : (isTablet ? 800 : 600)),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isTablet ? 20 : 12),
             child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
