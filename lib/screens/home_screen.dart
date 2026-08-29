@@ -512,13 +512,11 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      body: LayoutBuilder(builder: (context, constraints) {
-        final isTablet = MediaQuery.of(context).size.width > 600;
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 20 : 12),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
             child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
@@ -629,8 +627,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ]),
           ),
         ),
-      ),
-        }),
       );
     );
   }
