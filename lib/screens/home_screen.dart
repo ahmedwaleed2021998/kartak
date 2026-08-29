@@ -646,10 +646,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
           const SizedBox(height: 4),
           const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-            ]),
-          ),
-        ),
-      ),
+]),
+           ),
+         ),
+       ),
+       }),
+      );
     );
   }
 }
