@@ -386,7 +386,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         Positioned(top: 6, left: 6, child: InkWell(onTap: () => _toggleFav(pid), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle), child: Icon(favIds.contains(pid) ? Icons.star : Icons.star_border, color: favIds.contains(pid) ? Colors.amber : Colors.white70, size: 14)))),
                         Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
                       ],
-                      ),
                     ),
                   ),
                 ),
@@ -411,6 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ]),
               ),
             ),
+          ),
           );
         },
       );
