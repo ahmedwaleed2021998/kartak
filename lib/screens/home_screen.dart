@@ -13,6 +13,7 @@ import '../services/favorites_service.dart';
 import '../services/theme_provider.dart';
 import '../services/version_service.dart';
 import 'card_detail_screen.dart';
+import 'fourteen_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
 
@@ -503,9 +504,12 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
           if (_subRemaining.isNotEmpty)
@@ -562,6 +566,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FourteenScreen())),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFFE11D48)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1)),
+                  ),
+                  child: const Column(children: [
+                    Icon(Icons.swap_horiz, color: Colors.white, size: 28),
+                    SizedBox(height: 6),
+                    Text("تحويل 14 قرش", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
+                    Text("نظام جديد", style: TextStyle(color: Colors.white70, fontSize: 9), textAlign: TextAlign.center),
+                  ]),
+                ),
+              ),
+            ),
           ]),
           const SizedBox(height: 8),
           TextField(
@@ -588,10 +613,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           buildGrid(maredProducts),
           const SizedBox(height: 16),
-          const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
           const SizedBox(height: 4),
-          const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.grey, fontSize: 10)),
-        ]),
+          const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            ]),
+          ),
+        ),
       ),
     );
   }

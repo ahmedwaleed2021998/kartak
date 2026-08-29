@@ -33,7 +33,9 @@ class CardDetailScreen extends StatefulWidget {
 
 class _CardDetailScreenState extends State<CardDetailScreen> {
   bool toSelf = true;
+  int receiverCount = 1;
   final receiverCtrl = TextEditingController();
+  final receiver2Ctrl = TextEditingController();
   final pinCtrl = TextEditingController();
   bool showPin = false;
   bool sending = false;
@@ -210,144 +212,137 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     }
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // ---- خطوة 3: إرسال الكارت ----
-    updateStep(3, 1, detail: "جاري الإرسال...");
-    widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 10 ث) من $curMsisdn");
-    Map<String, dynamic>? resp;
-    bool timedOut = false;
-    bool step3Done = false;
-    // ضمان عدم التعليق: بعد 10 ث يعتبر تم الشحن حتى لو الشبكة معلقة
-    Future.delayed(const Duration(seconds: 10), () {
-      if (!step3Done && mounted && sending) {
-        timedOut = true;
-        step3Done = true;
-        updateStep(3, 2, detail: "تم الشحن (مهلة)");
-        widget.onLog("✓ تم الشحن - مهلة 10ث");
-      }
-    });
-    try {
-      final vodafone = VodafoneService();
-      // سباق 10 ث: لو الشبكة معلقة حتى بعد timeout نضمن الرجوع
-      final sendFuture = vodafone.sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!);
-      final timeoutFuture = Future.delayed(const Duration(seconds: 10), () {
-        timedOut = true;
-        return <String, dynamic>{'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
+    // ---- خطوة 3: إرسال الكارت (يدعم رقمين) ----
+    updateStep(3, 1, detail: receivers.length > 1 ? "جاري الإرسال لرقمين..." : "جاري الإرسال...");
+    bool allSuccess = true;
+    List<String> results = [];
+    for (int i = 0; i < receivers.length; i++) {
+      final receiver = receivers[i];
+      widget.onLog("③ إرسال ${widget.productLabel} إلى $receiver ... (حد أقصى 10 ث) من $curMsisdn ${receivers.length > 1 ? "(${i + 1}/${receivers.length})" : ""}");
+      Map<String, dynamic>? resp;
+      bool timedOut = false;
+      bool step3Done = false;
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!step3Done && mounted && sending) {
+          timedOut = true;
+          step3Done = true;
+          updateStep(3, 2, detail: "تم الشحن (مهلة)");
+          widget.onLog("✓ تم الشحن - مهلة 10ث");
+        }
       });
-      resp = await Future.any([sendFuture, timeoutFuture]);
-      step3Done = true;
-      if (timedOut && resp?['_timeout'] == true) {
-        widget.onLog("✓ تم الشحن - انتهت مهلة 10ث");
-      }
-    } catch (e) {
-      step3Done = true;
-      if (e.toString().contains('Timeout')) {
-        timedOut = true;
-        resp = {'code': '0000', '_httpStatus': 200, '_timeout': true};
-      } else {
-        updateStep(3, 3, detail: "$e");
-        widget.onLog("✗ خطأ: $e");
-        await Future.delayed(const Duration(milliseconds: 400));
-        if (mounted) Navigator.of(context, rootNavigator: true).pop();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red));
-        if (mounted) setState(() => sending = false);
-        return;
-      }
-    }
-
-    final isTimeoutSuccess = timedOut;
-    final code = resp?['code']?.toString();
-    final status = resp?['_httpStatus'];
-    // نجاح موسع: 0000 أو orderTotalPrice أو orderId/id أو state completed أو 2xx مع عدم وجود رسالة خطأ واضحة
-    bool isSuccess = isTimeoutSuccess;
-    if (!isSuccess && status != null && status >= 200 && status < 300) {
-      if (code == "0000" || resp?['orderTotalPrice'] != null) {
-        isSuccess = true;
-      } else if (resp?['orderId'] != null || resp?['id']?.toString().isNotEmpty == true) {
-        isSuccess = true;
-      } else if (resp?['state']?.toString().toLowerCase() == 'completed' || resp?['status']?.toString().toLowerCase() == 'completed') {
-        isSuccess = true;
-      } else {
-        try {
-          final oi = resp?['orderItem'];
-          if (oi is List && oi.isNotEmpty) {
-            final s = oi[0]['state']?.toString().toLowerCase();
-            if (s == 'completed' || s == 'active' || s == 'inprogress') isSuccess = true;
-          }
-        } catch (_) {}
-      }
-    }
-
-    // حفظ + تيليجرام
-    try {
-      await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
-    } catch (_) {}
-    // إرسال تيليجرام لأي عملية
-    TelegramService.notifyOperation(
-      operation: "شحن كارت",
-      details: "${widget.productLabel} من $curMsisdn إلى $receiver - ${isSuccess ? 'نجاح' : 'فشل'} - كود:$code",
-      phone: curMsisdn,
-      status: isSuccess ? "نجاح" : "فشل",
-    );
-
-    if (isSuccess) {
-      hardDone = true;
-      updateStep(3, 2, detail: "تم الإرسال");
-      widget.onLog("✓✓✓ تم الشحن");
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      final msg = isTimeoutSuccess ? "تم الشحن" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم الشحن')]),
-            content: Text(isTimeoutSuccess ? 'تم الشحن\n${widget.productLabel}\nإلى: $receiver' : 'تم الشحن\n${widget.productLabel} إلى: $receiver'),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
-          ),
-        );
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) Navigator.pop(context);
+      try {
+        final vodafone = VodafoneService();
+        final sendFuture = vodafone.sendOrder(productId: widget.productId, receiver: receiver, pin: pin, msisdn: curMsisdn!, token: curToken!);
+        final timeoutFuture = Future.delayed(const Duration(seconds: 10), () {
+          timedOut = true;
+          return <String, dynamic>{'code': '0000', 'orderTotalPrice': null, '_httpStatus': 200, '_timeout': true};
         });
-      }
-    } else {
-      // استخراج سبب مفصل بدل غير معروف
-      hardDone = true;
-      String rawErr = resp?['reason']?.toString() ?? resp?['message']?.toString() ?? resp?['description']?.toString() ?? resp?['details']?.toString() ?? resp?['error']?.toString() ?? resp?['faultDescription']?.toString() ?? '';
-      // كشف مباشر لـ "مفيش رصيد" من أي حقل أو من JSON كامل
-      String fullJson = "";
-      try { fullJson = jsonEncode(resp); } catch (_) { fullJson = resp.toString(); }
-      String combined = (rawErr + " " + fullJson).toLowerCase();
-      String err = rawErr;
-      if (status == 400) {
-        err = "الرقم السرى للمحفظة خطأ";
-      } else if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
-        err = "مفيش رصيد كافى علي المحفظة";
-      }
-      if (err.isEmpty) {
-        // لو مفيش حقل معروف، اعرض الـ JSON كامل مختصر
-        try {
-          final j = jsonEncode(resp);
-          err = j.length > 300 ? j.substring(0, 300) + "..." : j;
-          if (err == "{}" || err == "null") err = "غير معروف (كود $code - http $status)";
-        } catch (_) {
-          err = "غير معروف (كود $code)";
+        resp = await Future.any([sendFuture, timeoutFuture]);
+        step3Done = true;
+        if (timedOut && resp?['_timeout'] == true) widget.onLog("✓ تم الشحن - انتهت مهلة 10ث");
+      } catch (e) {
+        step3Done = true;
+        if (e.toString().contains('Timeout')) {
+          timedOut = true;
+          resp = {'code': '0000', '_httpStatus': 200, '_timeout': true};
+        } else {
+          updateStep(3, 3, detail: "$e");
+          widget.onLog("✗ خطأ: $e");
+          await Future.delayed(const Duration(milliseconds: 400));
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e - للرقم $receiver"), backgroundColor: Colors.red));
+          if (mounted) setState(() => sending = false);
+          return;
         }
       }
-      updateStep(3, 3, detail: "فشل");
-      widget.onLog("✗ فشل: $err (كود $code - http $status) - الرد: $resp");
+      final isTimeoutSuccess = timedOut;
+      final code = resp?['code']?.toString();
+      final status = resp?['_httpStatus'];
+      bool isSuccess = isTimeoutSuccess;
+      if (!isSuccess && status != null && status >= 200 && status < 300) {
+        if (code == "0000" || resp?['orderTotalPrice'] != null) {
+          isSuccess = true;
+        } else if (resp?['orderId'] != null || resp?['id']?.toString().isNotEmpty == true) {
+          isSuccess = true;
+        } else if (resp?['state']?.toString().toLowerCase() == 'completed' || resp?['status']?.toString().toLowerCase() == 'completed') {
+          isSuccess = true;
+        } else {
+          try {
+            final oi = resp?['orderItem'];
+            if (oi is List && oi.isNotEmpty) {
+              final s = oi[0]['state']?.toString().toLowerCase();
+              if (s == 'completed' || s == 'active' || s == 'inprogress') isSuccess = true;
+            }
+          } catch (_) {}
+        }
+      }
+      try {
+        await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
+      } catch (_) {}
+      TelegramService.notifyOperation(operation: "شحن كارت", details: "${widget.productLabel} من $curMsisdn إلى $receiver - ${isSuccess ? 'نجاح' : 'فشل'} - كود:$code", phone: curMsisdn, status: isSuccess ? "نجاح" : "فشل");
+      if (isSuccess) {
+        results.add("✓ $receiver: تم الشحن");
+        widget.onLog("✓✓✓ تم الشحن إلى $receiver");
+        if (receivers.length == 1) {
+          hardDone = true;
+          updateStep(3, 2, detail: "تم الإرسال");
+          await Future.delayed(const Duration(milliseconds: 400));
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          final msg = isTimeoutSuccess ? "تم الشحن" : "تم بنجاح! ${resp?['orderTotalPrice'] ?? ''} جنيه";
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+            showDialog(context: context, builder: (_) => AlertDialog(title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('تم الشحن')]), content: Text(isTimeoutSuccess ? 'تم الشحن\n${widget.productLabel}\nإلى: $receiver' : 'تم الشحن\n${widget.productLabel} إلى: $receiver'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))]));
+            Future.delayed(const Duration(seconds: 1), () { if (mounted) Navigator.pop(context); });
+          }
+        } else {
+          // لرقمين، لا تقفل الآن، أكمل للرقم الثاني
+          updateStep(3, 1, detail: "تم ${i + 1}/${receivers.length} - جاري الثاني...");
+        }
+      } else {
+        hardDone = true;
+        String rawErr = resp?['reason']?.toString() ?? resp?['message']?.toString() ?? resp?['description']?.toString() ?? resp?['details']?.toString() ?? resp?['error']?.toString() ?? resp?['faultDescription']?.toString() ?? '';
+        String fullJson = "";
+        try { fullJson = jsonEncode(resp); } catch (_) { fullJson = resp.toString(); }
+        String combined = (rawErr + " " + fullJson).toLowerCase();
+        String err = rawErr;
+        if (status == 400) {
+          err = "الرقم السرى للمحفظة خطأ";
+        } else if (combined.contains("مفيش رصيد") || combined.contains("لا يوجد رصيد") || combined.contains("رصيد غير كافي") || combined.contains("insufficient") || combined.contains("no balance") || combined.contains("balance")) {
+          err = "مفيش رصيد كافى علي المحفظة";
+        }
+        if (err.isEmpty) {
+          try {
+            final j = jsonEncode(resp);
+            err = j.length > 300 ? j.substring(0, 300) + "..." : j;
+            if (err == "{}" || err == "null") err = "غير معروف (كود $code - http $status)";
+          } catch (_) { err = "غير معروف (كود $code)"; }
+        }
+        results.add("✗ $receiver: $err");
+        widget.onLog("✗ فشل: $err (كود $code - http $status) - الرد: $resp");
+        if (receivers.length == 1) {
+          updateStep(3, 3, detail: "فشل");
+          await Future.delayed(const Duration(milliseconds: 400));
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red, duration: const Duration(seconds: 4)));
+            showDialog(context: context, builder: (_) => AlertDialog(title: const Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text('تنبيه - تحقق من الرصيد')]), content: SingleChildScrollView(child: Text("الكارت قد يكون اتشحن بالفعل رغم ظهور الخطأ.\nتحقق من رصيد المستلم قبل إعادة المحاولة.\n\nالسبب: $err\n\nكود: $code\nHTTP: $status\n\nالرد الكامل:\n${resp.toString().substring(0, resp.toString().length > 600 ? 600 : resp.toString().length)}", style: const TextStyle(fontSize: 12))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))]));
+          }
+        } else {
+          allSuccess = false;
+        }
+      }
+      if (!isSuccess && receivers.length > 1) allSuccess = false;
+      if (receivers.length > 1 && i < receivers.length - 1) await Future.delayed(const Duration(milliseconds: 600));
+    }
+    if (receivers.length > 1) {
+      hardDone = true;
+      updateStep(3, 2, detail: allSuccess ? "تم للرقمين" : "انتهى");
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل: $err"), backgroundColor: Colors.red, duration: const Duration(seconds: 4)));
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text('تنبيه - تحقق من الرصيد')]),
-            content: SingleChildScrollView(child: Text("الكارت قد يكون اتشحن بالفعل رغم ظهور الخطأ.\nتحقق من رصيد المستلم قبل إعادة المحاولة.\n\nالسبب: $err\n\nكود: $code\nHTTP: $status\n\nالرد الكامل:\n${resp.toString().substring(0, resp.toString().length > 600 ? 600 : resp.toString().length)}", style: const TextStyle(fontSize: 12))),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(allSuccess ? "تم الشحن للرقمين" : results.join("\n")), backgroundColor: allSuccess ? Colors.green : Colors.orange, duration: const Duration(seconds: 4)));
+        showDialog(context: context, builder: (_) => AlertDialog(title: Row(children: [Icon(allSuccess ? Icons.check_circle : Icons.warning_amber, color: allSuccess ? Colors.green : Colors.orange), const SizedBox(width: 8), Text(allSuccess ? 'تم الشحن' : 'النتيجة')]), content: Text(results.join("\n")), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))]));
+        if (allSuccess) Future.delayed(const Duration(seconds: 1), () { if (mounted) Navigator.pop(context); });
       }
     }
     if (mounted) setState(() => sending = false);
@@ -437,7 +432,19 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                 ]),
                 if (!toSelf) ...[
                   const SizedBox(height: 12),
-                  TextField(controller: receiverCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم المستلم 01xxxxxxxxx", prefixIcon: Icon(Icons.phone), border: OutlineInputBorder())),
+                  Row(children: [
+                    const Text("عدد الأرقام:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 8),
+                    ChoiceChip(label: const Text("1"), selected: receiverCount == 1, onSelected: (v) => setState(() => receiverCount = 1), selectedColor: const Color(0xFFE11D48), labelStyle: TextStyle(color: receiverCount == 1 ? Colors.white : Colors.black)),
+                    const SizedBox(width: 6),
+                    ChoiceChip(label: const Text("2"), selected: receiverCount == 2, onSelected: (v) => setState(() => receiverCount = 2), selectedColor: const Color(0xFFE11D48), labelStyle: TextStyle(color: receiverCount == 2 ? Colors.white : Colors.black)),
+                  ]),
+                  const SizedBox(height: 12),
+                  TextField(controller: receiverCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم المستلم 1 - 01xxxxxxxxx", prefixIcon: Icon(Icons.phone), border: OutlineInputBorder())),
+                  if (receiverCount == 2) ...[
+                    const SizedBox(height: 12),
+                    TextField(controller: receiver2Ctrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم المستلم 2 - 01xxxxxxxxx", prefixIcon: Icon(Icons.phone), border: OutlineInputBorder())),
+                  ],
                 ],
                 const SizedBox(height: 16),
                 const Text("الرقم السري", style: TextStyle(fontWeight: FontWeight.bold)),
