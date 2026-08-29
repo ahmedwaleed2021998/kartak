@@ -325,7 +325,6 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
-      // متجاوب للتابلت: 2 موبايل / 3 تابلت / 4 كبير
       final width = MediaQuery.of(context).size.width;
       final isTablet = width > 600;
       final isLargeTablet = width > 900;
@@ -627,8 +626,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ]),
           ),
         ),
-      );
+      ),
     );
   }
-}
 }
