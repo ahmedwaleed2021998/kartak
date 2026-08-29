@@ -325,12 +325,19 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
+      // متجاوب للتابلت: 2 موبايل / 3 تابلت / 4 كبير
+      final width = MediaQuery.of(context).size.width;
+      final isTablet = width > 600;
+      final isLargeTablet = width > 900;
+      final crossCount = isLargeTablet ? 4 : (isTablet ? 3 : 2);
+      final aspect = isLargeTablet ? 0.74 : (isTablet ? 0.76 : 0.78);
+      final imageH = isLargeTablet ? 135.0 : (isTablet ? 125.0 : 110.0);
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.78,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossCount,
+          childAspectRatio: aspect,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -353,19 +360,20 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.antiAlias,
               child: Column(children: [
                 SizedBox(
-                  height: 110,
+                  height: imageH,
                   width: double.infinity,
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.asset(
-                          'assets/images/cards/$pid.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-                        ),
-                        Container(color: Colors.black.withOpacity(0.12)),
+                          Container(color: const Color(0xFF1E293B)),
+                          Image.asset(
+                            'assets/images/cards/$pid.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B), child: Center(child: Image.asset('assets/images/logo.png', fit: BoxFit.contain, height: 70))),
+                          ),
+                          Container(color: Colors.black.withOpacity(0.10)),
                         Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
                         Positioned(top: 6, left: 6, child: InkWell(onTap: () => _toggleFav(pid), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle), child: Icon(favIds.contains(pid) ? Icons.star : Icons.star_border, color: favIds.contains(pid) ? Colors.amber : Colors.white70, size: 14)))),
                         Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
@@ -504,11 +512,13 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
+      body: LayoutBuilder(builder: (context, constraints) {
+        final isTablet = MediaQuery.of(context).size.width > 600;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isTablet ? 20 : 12),
             child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
@@ -620,6 +630,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+        }),
+      );
     );
   }
+}
 }
