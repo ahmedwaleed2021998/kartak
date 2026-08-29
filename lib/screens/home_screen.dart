@@ -515,15 +515,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: LayoutBuilder(builder: (context, constraints) {
-        final w = MediaQuery.of(context).size.width;
-        final isTablet = w > 600;
-        final isLarge = w > 900;
-        return SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: isLarge ? 1100 : (isTablet ? 800 : 600)),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(isTablet ? 20 : 12),
+        final isTablet = MediaQuery.of(context).size.width > 600;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
+            child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
             child: Column(children: [
           connectionCard,
           if (_subRemaining.isNotEmpty) const SizedBox(height: 8),
@@ -655,12 +652,11 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 4),
           const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
 ]),
-            ),
-          ),
-        ),
-        ),
-        }),
-       );
-     );
-   }
+           ),
+         ),
+       ),
+       }),
+      );
+    );
+  }
 }
