@@ -14,8 +14,6 @@ import '../services/theme_provider.dart';
 import '../services/version_service.dart';
 import 'card_detail_screen.dart';
 import 'fourteen_screen.dart';
-import 'offers365_screen.dart';
-import 'recharge_balance_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
 
@@ -327,19 +325,12 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (favIds.isNotEmpty) {
         filtered = [...items.where((p) => favIds.contains(p.$3)), ...items.where((p) => !favIds.contains(p.$3))];
       }
-      // متجاوب للتابلت: 2 عمود موبايل، 3-4 تابلت مع تحسين
-      final width = MediaQuery.of(context).size.width;
-      final isTablet = width > 600;
-      final isLargeTablet = width > 900;
-      final crossCount = isLargeTablet ? 4 : (isTablet ? 3 : 2);
-      final aspect = isLargeTablet ? 0.74 : (isTablet ? 0.76 : 0.78);
-      final imageH = isLargeTablet ? 135.0 : (isTablet ? 125.0 : 110.0);
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossCount,
-          childAspectRatio: aspect,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.78,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -362,20 +353,19 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.antiAlias,
               child: Column(children: [
                 SizedBox(
-                  height: imageH,
+                  height: 110,
                   width: double.infinity,
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                          Container(color: const Color(0xFF1E293B)),
-                          Image.asset(
-                            'assets/images/cards/$pid.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B), child: Center(child: Image.asset('assets/images/logo.png', fit: BoxFit.contain, height: 70))),
-                          ),
-                          Container(color: Colors.black.withOpacity(0.10)),
+                        Image.asset(
+                          'assets/images/cards/$pid.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                        ),
+                        Container(color: Colors.black.withOpacity(0.12)),
                         Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), child: Text(number, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB90A1A))))),
                         Positioned(top: 6, left: 6, child: InkWell(onTap: () => _toggleFav(pid), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle), child: Icon(favIds.contains(pid) ? Icons.star : Icons.star_border, color: favIds.contains(pid) ? Colors.amber : Colors.white70, size: 14)))),
                         Positioned(bottom: 6, left: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(6)), child: Text(isFakka ? "وحدات فكة" : isMared ? name.split(" ").last : "رصيد", textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
@@ -514,12 +504,10 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      body: LayoutBuilder(builder: (context, constraints) {
-        final isTablet = MediaQuery.of(context).size.width > 600;
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isTablet ? 900 : 600),
-            child: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(12),
             child: Column(children: [
           connectionCard,
@@ -578,9 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
+            const SizedBox(width: 8),
             Expanded(
               child: InkWell(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FourteenScreen())),
@@ -597,27 +583,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(height: 6),
                     Text("تحويل 14 قرش", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
                     Text("نظام جديد", style: TextStyle(color: Colors.white70, fontSize: 9), textAlign: TextAlign.center),
-                  ]),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen())),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.fromBorderSide(BorderSide(color: Color(0xFFFACC15), width: 1)),
-                  ),
-                  child: const Column(children: [
-                    Icon(Icons.card_giftcard, color: Color(0xFFFACC15), size: 28),
-                    SizedBox(height: 6),
-                    Text("عروض 365", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                    Text("فودافون", style: TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center),
                   ]),
                 ),
               ),
@@ -651,12 +616,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text("المطور AHMED_ELDEEP", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
           const SizedBox(height: 4),
           const Text("كروت وشحن © 2026", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-]),
-           ),
-         ),
-       ),
-       }),
-      );
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }
