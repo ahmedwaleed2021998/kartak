@@ -17,6 +17,7 @@ import 'fourteen_screen.dart';
 import 'offers365_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -619,6 +620,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ]),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
+              child: const Row(children: [Icon(Icons.history, color: Colors.white, size: 20), SizedBox(width: 8), Text("سجل العمليات - آخر 50 عملية", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)), Spacer(), Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 14)]),
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: searchCtrl,
