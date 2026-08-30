@@ -517,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.white70,
         currentIndex: 0,
         onTap: (i) {
-          if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen()));
+          if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => Offers365Screen()));
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
@@ -612,7 +612,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen())),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Offers365Screen())),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(12),
