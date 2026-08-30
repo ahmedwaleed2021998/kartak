@@ -436,31 +436,12 @@ class UserPopup(ctk.CTkToplevel):
     def _start_delete(self):
         if not messagebox.askyesno("Confirm Delete", f"Delete user '{self.email_display}'?"):
             return
-        # للحسابات القديمة اللي ملهاش plain، اطلب الباسورد عشان يحذف من Auth كمان
-        pw = None
-        # حاول تجيب plain من الـ DB
-        try:
-            users = get_all_users()
-            key = encode_email(self.email_display)
-            ud = users.get(key) if users else None
-            if ud is None and users and self.email_display.strip() in users:
-                ud = users.get(self.email_display.strip())
-            has_plain = isinstance(ud, dict) and ud.get("plain")
-            if not has_plain:
-                pw = simpledialog.askstring("Password for Auth delete", f"Enter password for '{self.email_display}' to delete from Auth too (leave empty for DB only):", show="•", parent=self)
-                # لو لغى، كمل بدون باسورد
-                if pw is None:
-                    return
-        except:
-            pw = None
-        self._delete_pw = pw
         self._set_msg(self.del_msg, "Loading...")
         self.btn_delete.configure(state="disabled")
         threading.Thread(target=self._delete_worker, daemon=True).start()
 
     def _delete_worker(self):
-        pw = getattr(self, "_delete_pw", None)
-        ok, msg = delete_user(self.email_display, password_for_auth=pw if pw else None)
+        ok, msg = delete_user(self.email_display)
         self.after(0, lambda: self._set_msg(self.del_msg, msg, ok))
         self.after(0, lambda: self.btn_delete.configure(state="normal"))
         if ok:
