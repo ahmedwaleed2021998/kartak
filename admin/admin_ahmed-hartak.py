@@ -447,7 +447,7 @@ class UserPopup(ctk.CTkToplevel):
                 ud = users.get(self.email_display.strip())
             has_plain = isinstance(ud, dict) and ud.get("plain")
             if not has_plain:
-                pw = simpledialog.askstring("Password for Auth delete", f"أدخل باسورد '{self.email_display}' لحذفه من Authentication أيضاً (اتركه فاضي لو هتحذف من Database بس):", show="•", parent=self)
+                pw = simpledialog.askstring("Password for Auth delete", f"Enter password for '{self.email_display}' to delete from Auth too (leave empty for DB only):", show="•", parent=self)
                 # لو لغى، كمل بدون باسورد
                 if pw is None:
                     return
