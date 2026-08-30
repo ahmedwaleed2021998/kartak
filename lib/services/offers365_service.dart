@@ -15,10 +15,6 @@ class Offers365Service {
       'x-agent-build': '1063',
       'digitalId': '244BQYOGFM0IM',
       'device-id': 'b83aab2d8fa633da',
-      'Host': 'mobile.vodafone.com.eg',
-      'Connection': 'keep-alive',
-      'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
-      'Accept-Encoding': 'gzip, deflate, br',
     };
     final body = {
       'username': number,
@@ -40,9 +36,7 @@ class Offers365Service {
     final params = {'@type': 'Promo', r'$.context.type': 'offerstab'};
     final headers = {
       'User-Agent': 'okhttp/4.12.0',
-      'Connection': 'Keep-Alive',
       'Accept': 'application/json',
-      'Accept-Encoding': 'gzip',
       'channel': 'MOBILE',
       'useCase': 'Promo',
       'Authorization': 'Bearer $token',
@@ -75,9 +69,7 @@ class Offers365Service {
     };
     final headers = {
       'User-Agent': 'okhttp/4.12.0',
-      'Connection': 'Keep-Alive',
       'Accept': 'application/json',
-      'Accept-Encoding': 'gzip',
       'channel': 'MOBILE',
       'useCase': 'Promo',
       'Authorization': 'Bearer $token',

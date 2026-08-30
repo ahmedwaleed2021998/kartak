@@ -511,19 +511,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(onPressed: () async => await FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: const Color(0xFFFACC15),
-        unselectedItemColor: Colors.white70,
-        currentIndex: 0,
-        onTap: (i) {
-          if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => Offers365Screen()));
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
-          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: "عروض 365"),
-        ],
-      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -612,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Offers365Screen())),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen())),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(12),
