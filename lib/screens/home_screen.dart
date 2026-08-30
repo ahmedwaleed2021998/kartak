@@ -14,6 +14,7 @@ import '../services/theme_provider.dart';
 import '../services/version_service.dart';
 import 'card_detail_screen.dart';
 import 'fourteen_screen.dart';
+import 'offers365_screen.dart';
 import 'joks_screen.dart';
 import 'flex_extra_screen.dart';
 
@@ -599,7 +600,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, title: const Text("عروض 365")), body: const Center(child: Text("عروض 365 - سيتم التفعيل قريبا", style: TextStyle(color: Colors.white)))))),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Offers365Screen())),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(12),
