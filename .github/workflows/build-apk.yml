@@ -15,6 +15,31 @@ jobs:
           flutter-version: '3.22.3'
           channel: 'stable'
           cache: true
+      - name: Generate fixed keystore if not in repo (secure fallback)
+        run: |
+          if [ ! -f "android/app/upload-keystore.jks" ]; then
+            echo "No keystore in repo (secure - not committed), generating temp fixed one..."
+            pip install cryptography -q
+            python3 << 'PY'
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.x509.oid import NameOID
+            from cryptography import x509
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            import datetime, pathlib
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            subject = issuer = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, "EG"), x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Cairo"), x509.NameAttribute(NameOID.LOCALITY_NAME, "Cairo"), x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Kartak"), x509.NameAttribute(NameOID.COMMON_NAME, "kartak")])
+            cert = x509.CertificateBuilder().subject_name(subject).issuer_name(issuer).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(datetime.datetime.now(datetime.timezone.utc)).not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10000)).add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True).sign(key, hashes.SHA256())
+            p12 = pkcs12.serialize_key_and_certificates(name=b"kartak", key=key, cert=cert, cas=None, encryption_algorithm=serialization.BestAvailableEncryption(b"kartak123"))
+            pathlib.Path("android/app").mkdir(parents=True, exist_ok=True)
+            pathlib.Path("android/app/upload-keystore.jks").write_bytes(p12)
+            pathlib.Path("android/key.properties").write_text("storePassword=kartak123\nkeyPassword=kartak123\nkeyAlias=kartak\nstoreFile=app/upload-keystore.jks\n", encoding="utf-8")
+            print("generated temp keystore")
+            PY
+          else
+            echo "Found committed keystore"
+          fi
+          ls -lh android/app/upload-keystore.jks android/key.properties 2>&1 | head -5 || true
       - name: Generate Android project
         run: |
           cp android/app/google-services.json /tmp/google-services.json 2>/dev/null || true
