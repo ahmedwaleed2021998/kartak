@@ -23,6 +23,8 @@ jobs:
           cp assets/images/logo.png /tmp/logo.png 2>/dev/null || true
           cp -r assets/images/cards /tmp/cards 2>/dev/null || true
           cp android/app/src/main/kotlin/com/kartak/kartak/MainActivity.kt /tmp/MainActivity.kt 2>/dev/null || true
+          cp android/key.properties /tmp/key.properties 2>/dev/null || true
+          cp android/app/upload-keystore.jks /tmp/upload-keystore.jks 2>/dev/null || true
           flutter create . --project-name kartak --org com.kartak --platforms android
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml 2>/dev/null || true
@@ -34,6 +36,9 @@ jobs:
           cp -r /tmp/cards/* assets/images/cards/ 2>/dev/null || true
           mkdir -p android/app/src/main/kotlin/com/kartak/kartak
           cp /tmp/MainActivity.kt android/app/src/main/kotlin/com/kartak/kartak/MainActivity.kt 2>/dev/null || true
+          mkdir -p android
+          cp /tmp/key.properties android/key.properties 2>/dev/null || true
+          cp /tmp/upload-keystore.jks android/app/upload-keystore.jks 2>/dev/null || true
           echo "=== BEFORE fix ==="
           cat android/app/build.gradle | grep -E "applicationId|namespace" || true
           sed -i 's/applicationId "com\.kartak\.kartak"/applicationId "com.kartak.app"/g' android/app/build.gradle || true
@@ -66,6 +71,40 @@ jobs:
             sed -i 's/minifyEnabled true/minifyEnabled true\n            shrinkResources true/' android/app/build.gradle || true
           fi
           cat android/app/build.gradle | grep -A2 -E "minifyEnabled|shrinkResources|proguardFiles" || true
+          echo "=== إعداد توقيع ثابت لتقليل تحذير Play Protect ==="
+          if [ -f "android/key.properties" ] && [ -f "android/app/upload-keystore.jks" ]; then
+            echo "Found keystore, patching build.gradle"
+            if ! grep -q "keystoreProperties" android/app/build.gradle; then
+              # add keystoreProperties at top
+              sed -i '1i def keystoreProperties = new Properties()\ndef keystorePropertiesFile = rootProject.file("key.properties")\nif (keystorePropertiesFile.exists()) { keystoreProperties.load(new FileInputStream(keystorePropertiesFile)) }' android/app/build.gradle
+            fi
+            if ! grep -q "signingConfigs" android/app/build.gradle; then
+              # add signingConfigs after android {
+              python3 << 'PYEOF'
+              import pathlib
+              p = pathlib.Path("android/app/build.gradle")
+              t = p.read_text(encoding="utf-8")
+              if "signingConfigs" not in t:
+                  t = t.replace("android {", "android {\n    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }")
+                  # add signingConfig to release
+                  if "signingConfig signingConfigs.release" not in t:
+                      t = t.replace("buildTypes {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }")
+                      # if already has release with minify, ensure signingConfig inside
+                      if t.count("signingConfig signingConfigs.release") > 1:
+                          # remove duplicate
+                          pass
+                  p.write_text(t, encoding="utf-8")
+                  print("patched build.gradle")
+              PYEOF
+            fi
+            cat android/app/build.gradle | grep -A8 "signingConfigs" || true
+          else
+            echo "No keystore found, build will use debug signing"
+          fi
+          echo "=== Manifest usesCleartextTraffic ==="
+          sed -i 's/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/android:usesCleartextTraffic="false" android:usesCleartextTraffic="false"/android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml || true
+          cat android/app/src/main/AndroidManifest.xml | grep usesCleartextTraffic || true
       - name: Install deps
         run: flutter pub get
       - name: Generate launcher icons from logo.png (PIL fallback)
