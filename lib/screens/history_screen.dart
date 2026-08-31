@@ -14,6 +14,19 @@ class HistoryScreen extends StatelessWidget {
     return DateFormat('dd/MM/yyyy HH:mm').format(d);
   }
 
+  Future<List<Map<String, dynamic>>> _loadHistory(FirestoreService svc) async {
+    try {
+      final docs = await svc.getOrdersOnce();
+      if (docs.isNotEmpty) return docs.map((d) => d.data() as Map<String, dynamic>).toList();
+    } catch (_) {}
+    // fallback RTDB
+    try {
+      final rtdb = await svc.getOrdersRtdb();
+      if (rtdb.isNotEmpty) return rtdb;
+    } catch (_) {}
+    return [];
+  }
+
   @override
   Widget build(BuildContext context) {
     final svc = FirestoreService();
@@ -26,13 +39,13 @@ class HistoryScreen extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: isTablet ? 750 : 600),
-            child: FutureBuilder<List<QueryDocumentSnapshot>>(
-              future: svc.getOrdersOnce(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _loadHistory(svc),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (snap.hasError) return Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("خطأ: ${snap.error}\n\nتأكد من تسجيل الدخول والإنترنت", style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)));
+                if (snap.hasError) return Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("خطأ: ${snap.error}\n\nسيتم الحفظ في السجل بعد أول عملية", style: const TextStyle(color: Colors.orangeAccent), textAlign: TextAlign.center)));
                 final docs = snap.data ?? [];
-                if (docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا يوجد عمليات سابقة\nكل عملية شحن هتظهر هنا", style: TextStyle(color: Colors.white70), textAlign: TextAlign.center)));
+                if (docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا يوجد عمليات سابقة\nكل عملية شحن هتظهر هنا تلقائيا", style: TextStyle(color: Colors.white70), textAlign: TextAlign.center)));
                 return RefreshIndicator(
                   onRefresh: () async => (context as Element).markNeedsBuild(),
                   child: ListView.separated(
@@ -40,13 +53,13 @@ class HistoryScreen extends StatelessWidget {
                     itemCount: docs.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, i) {
-                      final d = docs[i].data() as Map<String, dynamic>;
+                      final d = docs[i];
                       final name = d['productName']?.toString() ?? "-";
                       final receiver = d['receiver']?.toString() ?? "-";
                       final sender = d['sender']?.toString() ?? "-";
                       final status = d['status']?.toString() ?? "unknown";
                       final isSuccess = status == "success";
-                      final ts = d['createdAt'] as Timestamp?;
+                      final ts = d['createdAt'] is Timestamp ? d['createdAt'] as Timestamp : null;
                       final iso = d['createdAtLocal']?.toString();
                       return Container(
                         decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: isSuccess ? Colors.green.withOpacity(0.6) : Colors.red.withOpacity(0.6))),
