@@ -5,16 +5,21 @@ class Offers365Service {
   Future<String> login(String number, String password) async {
     final url = Uri.parse('https://mobile.vodafone.com.eg/auth/realms/vf-realm/protocol/openid-connect/token');
     final headers = {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Xiaomi M2102J20SG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 AnaVodafoneAndroid/2025.11.1',
-      'Accept': 'application/json',
+      'Accept': 'application/json, text/plain, */*',
+      'Connection': 'keep-alive',
+      'silentLogin': 'true',
       'x-agent-operatingsystem': '13',
       'clientId': 'AnaVodafoneAndroid',
+      'Accept-Language': 'en',
       'x-agent-device': 'Xiaomi M2102J20SG',
       'x-agent-version': '2025.11.1',
       'x-agent-build': '1063',
       'digitalId': '244BQYOGFM0IM',
       'device-id': 'b83aab2d8fa633da',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Host': 'mobile.vodafone.com.eg',
+      'Accept-Encoding': 'gzip',
+      'User-Agent': 'okhttp/4.12.0',
     };
     final body = {
       'username': number,
@@ -24,7 +29,8 @@ class Offers365Service {
       'client_id': 'ana-vodafone-app',
     };
     final resp = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
-    if (resp.statusCode != 200) throw Exception('فشل تسجيل الدخول: ${resp.statusCode}');
+    if (resp.statusCode == 401) throw Exception('401 - الرقم او الباسورد خطا');
+    if (resp.statusCode != 200) throw Exception('فشل تسجيل الدخول: ${resp.statusCode} - ${resp.body}');
     final data = jsonDecode(resp.body);
     final token = data['access_token'] as String?;
     if (token == null || token.isEmpty) throw Exception('لم يتم العثور على التوكن');

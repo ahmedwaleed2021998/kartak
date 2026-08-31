@@ -35,15 +35,28 @@ class FirestoreService {
     }, SetOptions(merge: true));
   }
 
-  /// جلب سجل العمليات
+  /// جلب سجل العمليات - مرتب بـ createdAtLocal لضمان الظهور حتى قبل اكتمال serverTimestamp
   Stream<QuerySnapshot> ordersStream() {
-    return _db
-        .collection('users')
-        .doc(uid)
-        .collection('orders')
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .snapshots();
+    try {
+      return _db.collection('users').doc(uid).collection('orders').orderBy('createdAtLocal', descending: true).limit(50).snapshots();
+    } catch (_) {
+      return _db.collection('users').doc(uid).collection('orders').orderBy('createdAt', descending: true).limit(50).snapshots();
+    }
+  }
+
+  /// جلب مرة واحدة (fallback)
+  Future<List<QueryDocumentSnapshot>> getOrdersOnce() async {
+    try {
+      final snap = await _db.collection('users').doc(uid).collection('orders').orderBy('createdAtLocal', descending: true).limit(50).get();
+      if (snap.docs.isNotEmpty) return snap.docs;
+    } catch (_) {}
+    try {
+      final snap = await _db.collection('users').doc(uid).collection('orders').orderBy('createdAt', descending: true).limit(50).get();
+      return snap.docs;
+    } catch (_) {
+      final snap = await _db.collection('users').doc(uid).collection('orders').limit(50).get();
+      return snap.docs;
+    }
   }
 
   /// إنشاء بروفايل عند أول تسجيل

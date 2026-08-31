@@ -32,9 +32,11 @@ class _Offers365ScreenState extends State<Offers365Screen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تسجيل الدخول بنجاح"), backgroundColor: Colors.green));
       await fetchOffers();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$e"), backgroundColor: Colors.red));
-      if (e.toString().contains("401")) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الباسورد او الرقم خطأ"), backgroundColor: Colors.red));
+      final msg = e.toString();
+      if (msg.contains("401") || msg.contains("الرقم او الباسورد")) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرقم او الباسورد خطا"), backgroundColor: Colors.red));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
       }
     } finally {
       setState(() => loadingLogin = false);
@@ -97,7 +99,6 @@ class _Offers365ScreenState extends State<Offers365Screen> {
               Icon(Icons.card_giftcard, color: Color(0xFFFACC15), size: 42),
               SizedBox(height: 8),
               Text("عروض 365 - فودافون", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-              Text("JOKS 365 OFFERS", style: TextStyle(color: Colors.white70, fontSize: 11)),
             ])),
           ),
           const SizedBox(height: 16),
