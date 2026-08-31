@@ -87,30 +87,24 @@ jobs:
           fi
           cat android/app/build.gradle | grep -A2 -E "minifyEnabled|shrinkResources|proguardFiles" || true
           echo "=== إعداد توقيع ثابت لتقليل تحذير Play Protect ==="
+          cat > /tmp/patch_build.py << 'PYEOF'
+import pathlib
+p = pathlib.Path("android/app/build.gradle")
+t = p.read_text(encoding="utf-8")
+if "signingConfigs" not in t:
+    t = t.replace("android {", "android {\n    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }")
+    if "signingConfig signingConfigs.release" not in t:
+        t = t.replace("buildTypes {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }")
+    p.write_text(t, encoding="utf-8")
+    print("patched build.gradle")
+PYEOF
           if [ -f "android/key.properties" ] && [ -f "android/app/upload-keystore.jks" ]; then
             echo "Found keystore, patching build.gradle"
             if ! grep -q "keystoreProperties" android/app/build.gradle; then
-              # add keystoreProperties at top
               sed -i '1i def keystoreProperties = new Properties()\ndef keystorePropertiesFile = rootProject.file("key.properties")\nif (keystorePropertiesFile.exists()) { keystoreProperties.load(new FileInputStream(keystorePropertiesFile)) }' android/app/build.gradle
             fi
             if ! grep -q "signingConfigs" android/app/build.gradle; then
-              # add signingConfigs after android {
-              python3 << 'PYEOF'
-              import pathlib
-              p = pathlib.Path("android/app/build.gradle")
-              t = p.read_text(encoding="utf-8")
-              if "signingConfigs" not in t:
-                  t = t.replace("android {", "android {\n    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }")
-                  # add signingConfig to release
-                  if "signingConfig signingConfigs.release" not in t:
-                      t = t.replace("buildTypes {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }")
-                      # if already has release with minify, ensure signingConfig inside
-                      if t.count("signingConfig signingConfigs.release") > 1:
-                          # remove duplicate
-                          pass
-                  p.write_text(t, encoding="utf-8")
-                  print("patched build.gradle")
-              PYEOF
+              python3 /tmp/patch_build.py
             fi
             cat android/app/build.gradle | grep -A8 "signingConfigs" || true
           else
