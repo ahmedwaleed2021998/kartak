@@ -12,6 +12,7 @@ import '../services/security_service.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_provider.dart';
 import '../services/version_service.dart';
+import '../services/points_service.dart';
 import 'card_detail_screen.dart';
 import 'fourteen_screen.dart';
 import 'offers365_screen.dart';
@@ -534,6 +535,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (_expiresDate != null) Text("ينتهي: ${_expiresDate!.day}/${_expiresDate!.month}/${_expiresDate!.year}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
               ]),
             ),
+          const SizedBox(height: 8),
+          StreamBuilder<int>(
+            stream: PointsService().pointsStream(),
+            builder: (context, snap) {
+              final pts = snap.data ?? 0;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFACC15))),
+                child: Row(children: [
+                  const Icon(Icons.stars, color: Color(0xFFFACC15), size: 20),
+                  const SizedBox(width: 8),
+                  const Text("نقاطك:", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(width: 6),
+                  Text("$pts", style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Spacer(),
+                  const Text("نقطة لكل عملية ناجحة", style: TextStyle(color: Colors.white70, fontSize: 10)),
+                ]),
+              );
+            },
+          ),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(

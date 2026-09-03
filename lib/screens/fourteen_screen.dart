@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/fourteen_service.dart';
 import '../services/telegram_service.dart';
+import '../services/points_service.dart';
 
 class FourteenScreen extends StatefulWidget {
   const FourteenScreen({super.key});
@@ -37,6 +38,7 @@ class _FourteenScreenState extends State<FourteenScreen> {
     }
     final res = await svc.convert(phone, token, encData.enc!, encData.tariffId ?? "", encData.subId ?? "");
     setState(() => loading = false);
+    if (res.success) { try { await PointsService().addPointsForCurrentUser(5); } catch (_) {} }
     TelegramService.notifyOperation(operation: "تحويل 14 قرش", details: res.message, phone: phone, status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: res.success ? Colors.green : Colors.red));

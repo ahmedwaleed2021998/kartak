@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/joks_service.dart';
 import '../services/telegram_service.dart';
+import '../services/points_service.dart';
 
 class JoksScreen extends StatefulWidget {
   const JoksScreen({super.key});
@@ -86,6 +87,7 @@ class _JoksScreenState extends State<JoksScreen> {
     addLog(res.message);
     TelegramService.notifyOperation(operation: "JoKs خصم 50%", details: "${offer['bundle_name']} - ${offer['discounted_price']}ج بدل ${offer['original_price']}ج - ${res.message}", phone: phone, status: res.success ? "نجاح" : "فشل");
     if (res.success) {
+      try { await PointsService().addPointsForCurrentUser(15); } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: Colors.green));
       showDialog(context: context, builder: (_) => AlertDialog(title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text("تم التفعيل")]), content: Text(res.message), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("حسناً"))]));
     } else {

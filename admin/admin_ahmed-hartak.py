@@ -164,10 +164,9 @@ def reduce_user(email, days, hours, minutes):
         current_expires = None
     if current_expires is None:
         return False, "لا يوجد تاريخ انتهاء لتقليله"
-    # لا تقلل لأقل من الآن - لو هينتهي قبل الآن اعتبره منتهي
     new_expires = current_expires - extra
     if new_expires < now:
-        new_expires = now  # انتهى الآن
+        new_expires = now
     user["expires"] = new_expires
     if "email" not in user:
         user["email"] = email.strip().lower()
@@ -180,6 +179,55 @@ def reduce_user(email, days, hours, minutes):
         return False, f"Server error ({e.code})."
     except Exception:
         return False, "Could not connect to the database."
+
+
+def add_points(email, amount):
+    if amount <= 0:
+        return False, "العدد يجب أن يكون موجب"
+    users = get_all_users()
+    if users is None:
+        return False, "Could not connect to the database."
+    key = encode_email(email)
+    user = users.get(key)
+    if user is None:
+        user = users.get(email.strip())
+        if user is not None:
+            key = email.strip()
+        else:
+            return False, "البريد غير موجود"
+    if not isinstance(user, dict):
+        user = {"password": user, "email": email.strip().lower()}
+    cur = user.get("points", 0)
+    try:
+        cur = int(cur)
+    except:
+        cur = 0
+    user["points"] = cur + amount
+    if "email" not in user:
+        user["email"] = email.strip().lower()
+    url = f"{DB_URL}/{USERS_PATH}/{urllib.parse.quote(key, safe=',')}.json"
+    req = urllib.request.Request(url, data=json.dumps(user).encode("utf-8"), method="PUT")
+    try:
+        urllib.request.urlopen(req, timeout=15)
+        return True, f"تم إضافة {amount} نقطة - الإجمالي {user['points']}"
+    except urllib.error.HTTPError as e:
+        return False, f"Server error ({e.code})."
+    except Exception:
+        return False, "Could not connect to the database."
+
+
+def get_points(email):
+    users = get_all_users()
+    if users is None:
+        return 0
+    key = encode_email(email)
+    user = users.get(key) or users.get(email.strip())
+    if isinstance(user, dict):
+        try:
+            return int(user.get("points", 0))
+        except:
+            return 0
+    return 0
 
 
 def try_delete_auth_with_password(email, password):
@@ -295,19 +343,20 @@ class UserPopup(ctk.CTkToplevel):
             self.email_display = email_key
         self.on_change = on_change
         self.title(f"User: {self.email_display}")
-        self.geometry("360x560")
+        self.geometry("360x680")
         self.resizable(False, False)
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=16, pady=16)
 
-        ctk.CTkLabel(
-            container, text=self.email_display, font=("Arial", 14, "bold"), wraplength=320
-        ).pack(pady=(0, 12))
+        ctk.CTkLabel(container, text=self.email_display, font=("Arial", 14, "bold"), wraplength=320).pack(pady=(0, 12))
+        try:
+            pts = get_points(self.email_display)
+            ctk.CTkLabel(container, text=f"النقاط: {pts} ⭐", font=("Arial", 14, "bold"), text_color="#f1c40f").pack(pady=(0, 8))
+        except:
+            pass
 
-        ctk.CTkLabel(
-            container, text="Change Password", font=("Arial", 15, "bold")
-        ).pack(pady=(6, 2))
+        ctk.CTkLabel(container, text="Change Password", font=("Arial", 15, "bold")).pack(pady=(6, 2))
 
         self.pw_new = ctk.CTkEntry(container, placeholder_text="New password", show="\u2022")
         self.pw_new.pack(fill="x", padx=8, pady=4)
@@ -360,6 +409,14 @@ class UserPopup(ctk.CTkToplevel):
         self.btn_reduce.pack(fill="x", padx=8, pady=(6, 2))
         self.reduce_msg = ctk.CTkLabel(container, text="", font=("Arial", 12))
         self.reduce_msg.pack()
+
+        ctk.CTkLabel(container, text="Add Points", font=("Arial", 15, "bold")).pack(pady=(12, 2))
+        self.p_points = ctk.CTkEntry(container, placeholder_text="عدد النقاط")
+        self.p_points.pack(fill="x", padx=8, pady=4)
+        self.btn_points = ctk.CTkButton(container, text="Add Points", fg_color="#f1c40f", text_color="black", hover_color="#d4ac0d", command=self._start_add_points)
+        self.btn_points.pack(fill="x", padx=8, pady=(6, 2))
+        self.points_msg = ctk.CTkLabel(container, text="", font=("Arial", 12))
+        self.points_msg.pack()
 
         self.btn_delete = ctk.CTkButton(
             container, text="Delete Account", fg_color="#e74c3c",
@@ -433,6 +490,26 @@ class UserPopup(ctk.CTkToplevel):
         if ok and self.on_change:
             self.after(0, self.on_change)
 
+    def _start_add_points(self):
+        self._set_msg(self.points_msg, "Loading...")
+        self.btn_points.configure(state="disabled")
+        threading.Thread(target=self._add_points_worker, daemon=True).start()
+
+    def _add_points_worker(self):
+        val = self.p_points.get().strip()
+        if not val.isdigit():
+            msg, ok = "أدخل رقم صحيح للنقاط", False
+        else:
+            amt = int(val)
+            if amt <= 0:
+                msg, ok = "العدد يجب أن يكون موجب", False
+            else:
+                ok, msg = add_points(self.email_display, amt)
+        self.after(0, lambda: self._set_msg(self.points_msg, msg, ok))
+        self.after(0, lambda: self.btn_points.configure(state="normal"))
+        if ok and self.on_change:
+            self.after(0, self.on_change)
+
     def _start_delete(self):
         if not messagebox.askyesno("Confirm Delete", f"Delete user '{self.email_display}'?"):
             return
@@ -454,20 +531,22 @@ class AdminApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("كروت وشحن - Admin Panel | ahmed-hartak")
-        self.geometry("480x560")
+        self.geometry("520x620")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        self.tabview = ctk.CTkTabview(self, width=440, height=500)
+        self.tabview = ctk.CTkTabview(self, width=480, height=540)
         self.tabview.pack(pady=20, padx=20, fill="both", expand=True)
 
         self.tab_create = self.tabview.add("Create Account")
         self.tab_extend = self.tabview.add("Extend Time")
         self.tab_reduce = self.tabview.add("Reduce Time")
+        self.tab_points = self.tabview.add("Points")
         self.tab_users = self.tabview.add("Users")
         self._build_create_tab()
         self._build_extend_tab()
         self._build_reduce_tab()
+        self._build_points_tab()
         self._build_users_tab()
 
     def _grid(self, tab):
@@ -598,6 +677,18 @@ class AdminApp(ctk.CTk):
         self.r_msg_main = ctk.CTkLabel(self.tab_reduce, text="", font=("Arial", 13))
         self.r_msg_main.grid(row=7, column=0, columnspan=6, pady=5)
 
+    def _build_points_tab(self):
+        self._grid(self.tab_points)
+        ctk.CTkLabel(self.tab_points, text="Add Points", font=("Arial", 22, "bold")).grid(row=0, column=0, columnspan=6, pady=(20, 15))
+        self.po_email = self._entry_row(self.tab_points, 1, "Email", None, plc="user@mail.com")
+        ctk.CTkLabel(self.tab_points, text="Points", font=("Arial", 13)).grid(row=3, column=0, sticky="w", padx=20)
+        self.po_amount = ctk.CTkEntry(self.tab_points, placeholder_text="عدد النقاط")
+        self.po_amount.grid(row=4, column=0, columnspan=6, sticky="ew", padx=20, pady=(0, 10))
+        self.btn_points_main = ctk.CTkButton(self.tab_points, text="Add Points", fg_color="#f1c40f", text_color="black", hover_color="#d4ac0d", command=self._start_points_main)
+        self.btn_points_main.grid(row=5, column=0, columnspan=6, sticky="ew", padx=20, pady=(10, 5))
+        self.po_msg_main = ctk.CTkLabel(self.tab_points, text="", font=("Arial", 13))
+        self.po_msg_main.grid(row=6, column=0, columnspan=6, pady=5)
+
     def _build_users_tab(self):
         self._grid(self.tab_users)
         self.tab_users.grid_rowconfigure(1, weight=1)
@@ -708,6 +799,29 @@ class AdminApp(ctk.CTk):
         self.after(0, lambda: self._set_message(self.r_msg_main, msg, ok))
         self.after(0, lambda: self.btn_reduce_main.configure(state="normal"))
 
+    def _start_points_main(self):
+        self._set_message(self.po_msg_main, "Loading...")
+        self.btn_points_main.configure(state="disabled")
+        threading.Thread(target=self._points_main_worker, daemon=True).start()
+
+    def _points_main_worker(self):
+        email = self.po_email.get().strip().lower()
+        val = self.po_amount.get().strip()
+        if not email:
+            msg, ok = "Please enter an email.", False
+        elif not is_valid_email(email):
+            msg, ok = "البريد غير صحيح", False
+        elif not val.isdigit():
+            msg, ok = "أدخل رقم صحيح", False
+        else:
+            amt = int(val)
+            if amt <= 0:
+                msg, ok = "العدد موجب", False
+            else:
+                ok, msg = add_points(email, amt)
+        self.after(0, lambda: self._set_message(self.po_msg_main, msg, ok))
+        self.after(0, lambda: self.btn_points_main.configure(state="normal"))
+
     def _refresh_users(self):
         threading.Thread(target=self._refresh_worker, daemon=True).start()
 
@@ -736,17 +850,20 @@ class AdminApp(ctk.CTk):
                 if isinstance(user, dict) and 'email' in user:
                     display_email = user.get('email', display_email)
                 expires = user.get("expires") if isinstance(user, dict) else None
+                pts = 0
+                if isinstance(user, dict):
+                    try: pts = int(user.get("points", 0))
+                    except: pts = 0
                 if expires is None:
                     status = "no expiry"
                 elif expires > now:
                     days_left = (expires - now) / 86400
-                    status = f"active ({days_left:.1f} days left)"
+                    status = f"active ({days_left:.1f}d)"
                 else:
                     status = "EXPIRED"
-
                 btn = ctk.CTkButton(
                     self.users_frame,
-                    text=f"{display_email}  |  {status}",
+                    text=f"{display_email} | {status} | ⭐{pts}",
                     anchor="w",
                     command=lambda k=key: self._open_user_popup(k),
                 )

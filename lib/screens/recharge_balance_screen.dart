@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/vodafone_service.dart';
 import '../services/recharge_balance_service.dart';
 import '../services/telegram_service.dart';
+import '../services/points_service.dart';
 
 class RechargeBalanceScreen extends StatefulWidget {
   const RechargeBalanceScreen({super.key});
@@ -59,6 +60,7 @@ class _RechargeBalanceScreenState extends State<RechargeBalanceScreen> {
     setState(() => loading = true);
     final res = await rechargeSvc.recharge(token: token!, senderMsisdn: msisdn!, receiverNumber: receiver, amount: amount, pin: pin);
     setState(() => loading = false);
+    if (res.success) { try { await PointsService().addPointsForCurrentUser(10); } catch (_) {} }
     TelegramService.notifyOperation(operation: "شحن رصيد عادي", details: "$amount جنيه إلى $receiver - ${res.success ? 'نجاح' : 'فشل: ${res.data}'}", phone: msisdn, status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.success ? "تم شحن $amount جنيه إلى $receiver" : "فشل: ${res.data}"), backgroundColor: res.success ? Colors.green : Colors.red));

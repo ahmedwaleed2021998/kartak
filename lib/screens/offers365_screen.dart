@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/offers365_service.dart';
 import '../services/telegram_service.dart';
+import '../services/points_service.dart';
 
 class Offers365Screen extends StatefulWidget {
   const Offers365Screen({super.key});
@@ -61,6 +62,7 @@ class _Offers365ScreenState extends State<Offers365Screen> {
     final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text("تأكيد الاشتراك"), content: Text(desc), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")), ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("اشتراك"))]));
     if (ok != true) return;
     final res = await svc.subscribe(phoneCtrl.text.trim(), token!, offerId);
+    if (res.success) { try { await PointsService().addPointsForCurrentUser(10); } catch (_) {} }
     TelegramService.notifyOperation(operation: "عروض 365", details: "$desc - ${res.message}", phone: phoneCtrl.text.trim(), status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: res.success ? Colors.green : Colors.red));

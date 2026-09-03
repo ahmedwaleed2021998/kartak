@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/vodafone_service.dart';
 import '../services/firestore_service.dart';
 import '../services/telegram_service.dart';
+import '../services/points_service.dart';
 
 class CardDetailScreen extends StatefulWidget {
   final String productId;
@@ -288,6 +289,9 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       try {
         await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
       } catch (_) {}
+      if (isSuccess) {
+        try { await PointsService().addPointsForCurrentUser(10); } catch (_) {}
+      }
       TelegramService.notifyOperation(operation: "شحن كارت", details: "${widget.productLabel} من $curMsisdn إلى $receiver - ${isSuccess ? 'نجاح' : 'فشل'} - كود:$code", phone: curMsisdn, status: isSuccess ? "نجاح" : "فشل");
       if (isSuccess) {
         results.add("✓ $receiver: تم الشحن");
