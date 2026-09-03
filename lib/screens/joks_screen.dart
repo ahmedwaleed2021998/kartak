@@ -80,6 +80,11 @@ class _JoksScreenState extends State<JoksScreen> {
       ),
     );
     if (confirm != true) return;
+    if (!await PointsService().hasEnough(1)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur وتحتاج 1 - اشتري نقاط"), backgroundColor: Colors.orange));
+      return;
+    }
     setState(() => purchasing = true);
     addLog("جاري تفعيل ${offer['bundle_name']}...");
     final res = await joks.purchaseDiscountOffer(token!, phone, offer);
@@ -87,7 +92,7 @@ class _JoksScreenState extends State<JoksScreen> {
     addLog(res.message);
     TelegramService.notifyOperation(operation: "JoKs خصم 50%", details: "${offer['bundle_name']} - ${offer['discounted_price']}ج بدل ${offer['original_price']}ج - ${res.message}", phone: phone, status: res.success ? "نجاح" : "فشل");
     if (res.success) {
-      try { await PointsService().addPointsForCurrentUser(15); } catch (_) {}
+      try { await PointsService().deductPoints(1); } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: Colors.green));
       showDialog(context: context, builder: (_) => AlertDialog(title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text("تم التفعيل")]), content: Text(res.message), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("حسناً"))]));
     } else {

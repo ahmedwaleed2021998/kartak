@@ -78,6 +78,14 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
     if (ok != true) return;
 
+    // فحص النقاط - لازم نقطة واحدة
+    final requiredPoints = 1;
+    if (!await PointsService().hasEnough(requiredPoints)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur وتحتاج $requiredPoints - اشتري نقاط من المطور"), backgroundColor: Colors.orange));
+      return;
+    }
+
     setState(() => sending = true);
 
     // ====== خطوات الشحن - Dialog مع 3 مراحل ======
@@ -290,7 +298,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         await firestore.saveOrder(productName: widget.productLabel, productId: widget.productId, sender: curMsisdn!, receiver: receiver, status: isSuccess ? "success" : "failed", serverResponse: resp ?? {});
       } catch (_) {}
       if (isSuccess) {
-        try { await PointsService().addPointsForCurrentUser(10); } catch (_) {}
+        try { await PointsService().deductPoints(requiredPoints); } catch (_) {}
       }
       TelegramService.notifyOperation(operation: "شحن كارت", details: "${widget.productLabel} من $curMsisdn إلى $receiver - ${isSuccess ? 'نجاح' : 'فشل'} - كود:$code", phone: curMsisdn, status: isSuccess ? "نجاح" : "فشل");
       if (isSuccess) {

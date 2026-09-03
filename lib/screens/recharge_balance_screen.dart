@@ -57,10 +57,15 @@ class _RechargeBalanceScreenState extends State<RechargeBalanceScreen> {
       await connect();
       if (msisdn == null || token == null) return;
     }
+    if (!await PointsService().hasEnough(1)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur"), backgroundColor: Colors.orange));
+      return;
+    }
     setState(() => loading = true);
     final res = await rechargeSvc.recharge(token: token!, senderMsisdn: msisdn!, receiverNumber: receiver, amount: amount, pin: pin);
     setState(() => loading = false);
-    if (res.success) { try { await PointsService().addPointsForCurrentUser(10); } catch (_) {} }
+    if (res.success) { try { await PointsService().deductPoints(1); } catch (_) {} }
     TelegramService.notifyOperation(operation: "شحن رصيد عادي", details: "$amount جنيه إلى $receiver - ${res.success ? 'نجاح' : 'فشل: ${res.data}'}", phone: msisdn, status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.success ? "تم شحن $amount جنيه إلى $receiver" : "فشل: ${res.data}"), backgroundColor: res.success ? Colors.green : Colors.red));

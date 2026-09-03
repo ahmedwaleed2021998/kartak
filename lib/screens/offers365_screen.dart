@@ -61,8 +61,13 @@ class _Offers365ScreenState extends State<Offers365Screen> {
   Future<void> subscribe(String offerId, String desc) async {
     final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text("تأكيد الاشتراك"), content: Text(desc), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")), ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("اشتراك"))]));
     if (ok != true) return;
+    if (!await PointsService().hasEnough(1)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur"), backgroundColor: Colors.orange));
+      return;
+    }
     final res = await svc.subscribe(phoneCtrl.text.trim(), token!, offerId);
-    if (res.success) { try { await PointsService().addPointsForCurrentUser(10); } catch (_) {} }
+    if (res.success) { try { await PointsService().deductPoints(1); } catch (_) {} }
     TelegramService.notifyOperation(operation: "عروض 365", details: "$desc - ${res.message}", phone: phoneCtrl.text.trim(), status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: res.success ? Colors.green : Colors.red));

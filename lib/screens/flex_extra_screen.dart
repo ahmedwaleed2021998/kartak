@@ -27,6 +27,11 @@ class _FlexExtraScreenState extends State<FlexExtraScreen> {
       return;
     }
     final phone = flex.normalizePhone(rawPhone);
+    if (!await PointsService().hasEnough(1)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur"), backgroundColor: Colors.orange));
+      return;
+    }
     setState(() => loading = true);
     logs = "";
     addLog("جاري تسجيل الدخول...");
@@ -52,7 +57,7 @@ class _FlexExtraScreenState extends State<FlexExtraScreen> {
     addLog(res.message);
     setState(() => loading = false);
     TelegramService.notifyOperation(operation: "تزويد يومين فليكس", details: res.message, phone: phone, status: res.success ? "نجاح" : "فشل");
-    if (res.success) { try { await PointsService().addPointsForCurrentUser(5); } catch (_) {} }
+    if (res.success) { try { await PointsService().deductPoints(1); } catch (_) {} }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: res.success ? Colors.green : Colors.red));
       showDialog(context: context, builder: (_) => AlertDialog(title: Row(children: [Icon(res.success ? Icons.check_circle : Icons.error, color: res.success ? Colors.green : Colors.red), const SizedBox(width: 8), Text(res.success ? "تم التفعيل" : "فشل")]), content: Text(res.success ? res.message : "${res.message}\n\n${res.body ?? ''}".substring(0, (res.body ?? '').length > 300 ? 300 : (res.body ?? '').length)), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("حسناً"))]));

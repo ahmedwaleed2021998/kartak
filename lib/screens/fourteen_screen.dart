@@ -23,6 +23,11 @@ class _FourteenScreenState extends State<FourteenScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("أدخل الرقم وكلمة السر")));
       return;
     }
+    if (!await PointsService().hasEnough(1)) {
+      final cur = await PointsService().getPoints();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("نقاطك غير كافية: معاك $cur"), backgroundColor: Colors.orange));
+      return;
+    }
     setState(() => loading = true);
     final token = await svc.login(phone, pass);
     if (token == null) {
@@ -38,7 +43,7 @@ class _FourteenScreenState extends State<FourteenScreen> {
     }
     final res = await svc.convert(phone, token, encData.enc!, encData.tariffId ?? "", encData.subId ?? "");
     setState(() => loading = false);
-    if (res.success) { try { await PointsService().addPointsForCurrentUser(5); } catch (_) {} }
+    if (res.success) { try { await PointsService().deductPoints(1); } catch (_) {} }
     TelegramService.notifyOperation(operation: "تحويل 14 قرش", details: res.message, phone: phone, status: res.success ? "نجاح" : "فشل");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message), backgroundColor: res.success ? Colors.green : Colors.red));

@@ -36,17 +36,42 @@ class PointsService {
     }
   }
 
-  // إضافة نقاط بعد كل عملية ناجحة (يستدعيها التطبيق لكن الحماية الحقيقية من الأدمن فقط)
-  // هنا نعمل increment محلي عبر RTDB لكن الأدمن هو المتحكم الأساسي
+  // إضافة نقاط بعد كل عملية ناجحة
   Future<void> addPointsForCurrentUser(int amount) async {
     final key = _emailKey;
     if (key == null) return;
     try {
       final url = Uri.parse('$_rtdbUrl/users/${Uri.encodeComponent(key)}/points.json');
-      // استخدم transaction بسيط: جلب ثم كتابة
       final cur = await getPoints();
       final next = cur + amount;
       await http.put(url, body: jsonEncode(next)).timeout(const Duration(seconds: 8));
     } catch (_) {}
+  }
+
+  // هل معاه نقاط كافية؟
+  Future<bool> hasEnough(int required) async => await getPoints() >= required;
+
+  // خصم نقاط (للشحن) - يرجع false لو مفيش كفاية
+  Future<bool> deductPoints(int amount) async {
+    final key = _emailKey;
+    if (key == null) return false;
+    try {
+      final cur = await getPoints();
+      if (cur < amount) return false;
+      final next = cur - amount;
+      final url = Uri.parse('$_rtdbUrl/users/${Uri.encodeComponent(key)}/points.json');
+      await http.put(url, body: jsonEncode(next)).timeout(const Duration(seconds: 8));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // النقاط المطلوبة لكل كارت (تقدر تغيرها)
+  static int requiredForProduct(String productId) {
+    // فكة صغيرة 5، كبيرة 10، مارد 8
+    if (productId.contains("2.5") || productId.contains("4.25") || productId.contains("5")) return 5;
+    if (productId.contains("Mared") || productId.contains("مارد")) return 8;
+    return 10;
   }
 }
